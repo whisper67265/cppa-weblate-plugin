@@ -8,7 +8,7 @@ version = "0.1.0"
 description = "Standalone Weblate plugin for Boost documentation translation."
 readme = "README.md"
 requires-python = ">=3.11"
-license = "GPL-3.0-or-later"
+license = "BSL-1.0"
 keywords = [
   "boost",
   "gettext",
