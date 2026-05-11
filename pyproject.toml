@@ -11,7 +11,7 @@ requires-python = ">=3.11"
 license = "BSL-1.0"
 license-files = ["LICENSE"]
 authors = [
-  { name = "Andrew Jhang", email = "whisper67265@outlook.com" },
+  { name = "Andrew Zhang", email = "whisper67265@outlook.com" },
 ]
 classifiers = [
   "Environment :: Web Environment",
