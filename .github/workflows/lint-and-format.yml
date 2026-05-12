@@ -16,36 +16,23 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd   # v6.0.2
+    - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
       with:
         persist-credentials: false
-    - uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae   # v5.0.5
+    - uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae
       with:
-        path: |
-          ~/.cache/prek
-          ~/.cache/kingfisher
+        path: ~/.cache/prek
         key: ${{ runner.os }}-${{ runner.arch }}-prek-${{ hashFiles('.pre-commit-config.yaml') }}
         restore-keys: |
           ${{ runner.os }}-${{ runner.arch }}-prek-
     - name: Setup Python
-      uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405   # v6.2.0
+      uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
       with:
         python-version: '3.14'
-    - uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b   # v8.1.0
+    - uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b
       with:
         version: 0.11.12
-    - name: detect method
-      id: detect
-      run: |
-        if test -f requirements-lint.txt ; then
-          echo "method=requirements" >> "$GITHUB_OUTPUT"
-        elif test -f pyproject.toml && grep -q dependency-groups pyproject.toml ; then
-          echo "method=pep735" >> "$GITHUB_OUTPUT"
-        else
-          echo "method=uvx" >> "$GITHUB_OUTPUT"
-        fi
-    - name: pre-commit (PEP 735)
-      if: steps.detect.outputs.method == 'pep735'
+    - name: pre-commit
       run: |
         uv run --only-group pre-commit prek run --all-files --show-diff-on-failure
         uv run --only-group pre-commit prek cache gc
@@ -53,29 +40,10 @@ jobs:
         RUFF_OUTPUT_FORMAT: github
         REUSE_OUTPUT_FORMAT: github
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-    - name: pre-commit (uvx)
-      if: steps.detect.outputs.method == 'uvx'
-      run: |
-        uvx prek run --all-files --show-diff-on-failure
-        uvx prek cache gc
-      env:
-        RUFF_OUTPUT_FORMAT: github
-        REUSE_OUTPUT_FORMAT: github
-        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-    - name: pre-commit (requirements)
-      if: steps.detect.outputs.method == 'requirements'
-      run: |
-        uv pip install --system -r requirements-lint.txt
-        prek run --all-files --show-diff-on-failure
-        prek cache gc
-      env:
-        RUFF_OUTPUT_FORMAT: github
-        REUSE_OUTPUT_FORMAT: github
-        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     - name: diff
       run: git diff
       if: always()
-    - uses: pre-commit-ci/lite-action@5d6cc0eb514c891a40562a58a8e71576c5c7fb43 # v1.1.0
+    - uses: pre-commit-ci/lite-action@5d6cc0eb514c891a40562a58a8e71576c5c7fb43
       if: always()
       with:
         msg: 'chore(pre-commit): apply code formatting'
