@@ -45,7 +45,14 @@ Homepage = "https://github.com/cppalliance/cppa-weblate-plugin"
 Repository = "https://github.com/cppalliance/cppa-weblate-plugin"
 Issues = "https://github.com/cppalliance/cppa-weblate-plugin/issues"
 
+[tool.check-manifest]
+ignore = [
+  "*.yaml",
+  "*.yml",
+  ".editorconfig"
+]
+
 [tool.uv.build-backend]
 module-name = "boost_weblate"
 module-root = "src"
-source-include = ["docs/**"]
+source-include = ["docs/**", "settings-override.py"]
