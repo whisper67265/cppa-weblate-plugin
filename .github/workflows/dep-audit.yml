@@ -1,0 +1,82 @@
+# SPDX-FileCopyrightText: 2026 Andrew Zhang <whisper67265@outlook.com>
+#
+# SPDX-License-Identifier: BSL-1.0
+
+name: Dependency audit
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  dep-audit:
+    runs-on: ubuntu-latest
+    steps:
+    # actions/checkout v6.0.2
+    - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+      with:
+        persist-credentials: false
+    # actions/setup-python v6.2.0
+    - name: Setup Python
+      uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
+      with:
+        python-version: '3.14'
+    # astral-sh/setup-uv v8.1.0
+    - uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b
+      with:
+        version: 0.11.12
+    - name: Install system libraries for Weblate (venv Debian/Ubuntu)
+      run: |
+        sudo apt-get update
+        # https://docs.weblate.org/en/latest/admin/install/venv-debian.html#system-requirements
+        sudo apt-get install -y --no-install-recommends \
+          build-essential \
+          git \
+          gir1.2-pango-1.0 \
+          gir1.2-rsvg-2.0 \
+          libcairo-dev \
+          libffi-dev \
+          libgirepository-2.0-dev \
+          libacl1-dev \
+          liblz4-dev \
+          libzstd-dev \
+          libxxhash-dev \
+          libssl-dev \
+          libpq-dev \
+          libjpeg-dev \
+          libxml2-dev \
+          libxslt-dev \
+          libfreetype6-dev \
+          libyaml-dev \
+          libz-dev \
+          python3-dev \
+          python3-gdbm
+        # Optional:
+        sudo apt-get install -y --no-install-recommends \
+          libldap2-dev \
+          libldap-common \
+          libsasl2-dev \
+          libxmlsec1-dev
+    - name: Install project and tools
+      run: |
+        uv pip install --system -e .
+        uv pip install --system 'pip>=26.1' pip-audit 'pip-audit-extra>=2' liccheck 'setuptools>=69,<81'
+    - name: pip-audit (full report; all severities)
+      continue-on-error: true
+      run: |
+        uv pip freeze > /tmp/requirements-frozen.txt
+        pip-audit --requirement /tmp/requirements-frozen.txt --disable-pip --no-deps --format markdown --desc on
+    - name: pip-audit severity gate (CRITICAL and HIGH only)
+      run: |
+        pip-audit-extra --local --fail-level HIGH
+    - name: liccheck
+      run: |
+        uv pip freeze > /tmp/requirements-frozen.txt
+        liccheck --rfile /tmp/requirements-frozen.txt --level cautious --no-deps
+    # actions/dependency-review-action v5.0.0
+    - name: Dependency Review
+      if: github.event_name == 'pull_request'
+      uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294

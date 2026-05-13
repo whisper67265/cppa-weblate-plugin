@@ -7,14 +7,14 @@ build-backend = "uv_build"
 requires = ["uv_build>=0.8.18,<0.12.0"]
 
 [dependency-groups]
-dev = [
-  {include-group = "lint"}
-]
 lint = [
   {include-group = "pre-commit"}
 ]
 pre-commit = [
   "prek==0.3.13"
+]
+tooling = [
+  {include-group = "lint"}
 ]
 
 [project]
@@ -28,14 +28,13 @@ classifiers = [
   "Programming Language :: Python",
   "Programming Language :: Python :: 3",
   "Programming Language :: Python :: 3 :: Only",
-  "Programming Language :: Python :: 3.11",
   "Programming Language :: Python :: 3.12",
   "Programming Language :: Python :: 3.13",
   "Topic :: Software Development :: Internationalization",
   "Topic :: Software Development :: Localization"
 ]
 dependencies = [
-  "Weblate"
+  "Weblate>=5.16.0"
 ]
 description = "Standalone Weblate plugin for Boost documentation translation."
 keywords = [
@@ -51,8 +50,13 @@ license = "BSL-1.0"
 license-files = ["LICENSE"]
 name = "cppa-weblate-plugin"
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.12"
 version = "0.1.0"
+
+[project.optional-dependencies]
+dev = [
+  "prek==0.3.13"
+]
 
 [project.urls]
 Homepage = "https://github.com/cppalliance/cppa-weblate-plugin"
@@ -66,9 +70,39 @@ ignore = [
   ".editorconfig"
 ]
 
+# liccheck: regex on PyPI license classifiers (as_regex).
+[tool.liccheck]
+as_regex = true
+authorized_licenses = [
+  "mit",
+  "apache",
+  "bsd",
+  "isc",
+  "bsl",
+  "boost",
+  "business source",
+  "python software foundation",
+  "psf",
+  "gnu general public",
+  "\\bgpl\\b",
+  "affero",
+  "lesser gnu",
+  "lgpl",
+  "european union public",
+  "\\beupl\\b",
+  "agpl",
+  "mozilla",
+  "unlicense",
+  "ofl",
+  "zpl"
+]
+authorized_packages = {pyaskalono = ">=0.2.0"}
+level = "cautious"
+unauthorized_licenses = []
+
 [tool.ruff]
 line-length = 88
-target-version = "py311"
+target-version = "py312"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP"]
