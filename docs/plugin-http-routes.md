@@ -42,4 +42,4 @@ else:
 **Conclusion:** Putting **`boost_weblate.endpoint`** in `INSTALLED_APPS` does not register HTTP routes by itself. The plan’s two supported approaches are:
 
 - **`AppConfig.ready()`** — at startup, extend Weblate’s pattern list (this repo appends to **`weblate.urls.real_patterns`** in **`src/boost_weblate/endpoint/apps.py`**), **or**
-- **`ROOT_URLCONF`** in **`settings-override.py`** — a custom root URLconf that includes Weblate’s patterns and adds the plugin’s `include()`.
+- **`ROOT_URLCONF`** in **`boost_weblate/settings_override.py`** (copied to **`/app/data/settings-override.py`** in Docker) — a custom root URLconf that includes Weblate’s patterns and adds the plugin’s `include()`.
