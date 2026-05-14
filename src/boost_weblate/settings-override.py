@@ -32,3 +32,8 @@
 WEBLATE_FORMATS += (  # noqa: F821  # defined by Weblate before exec()
     "boost_weblate.formats.quickbook.QuickBookFormat",
 )
+
+# Plugin Django app (``boost_weblate.endpoint``): registers ``/boost-endpoint/`` URLs
+# from ``AppConfig.ready()``. The full config class path matches ``WEBLATE_ADD_APPS``
+# style installs (e.g. ``WEBLATE_ADD_APPS=boost_weblate.endpoint`` in Docker).
+INSTALLED_APPS += ("boost_weblate.endpoint.apps.BoostEndpointConfig",)  # noqa: F821
