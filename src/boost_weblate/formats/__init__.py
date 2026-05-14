@@ -4,4 +4,4 @@
 
 """Weblate translation format handlers for Boost (QuickBook and related)."""
 
-__all__: list[str] = []
+__all__: list[str] = ["QuickBookFormat"]

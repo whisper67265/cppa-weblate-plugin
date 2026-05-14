@@ -11,7 +11,8 @@ lint = [
   {include-group = "pre-commit"}
 ]
 pre-commit = [
-  "prek==0.3.13"
+  "prek==0.3.13",
+  "pytest>=8.3"
 ]
 tooling = [
   {include-group = "lint"}
@@ -55,7 +56,8 @@ version = "0.1.0"
 
 [project.optional-dependencies]
 dev = [
-  "prek==0.3.13"
+  "prek==0.3.13",
+  "pytest>=8.3"
 ]
 
 [project.urls]
@@ -100,6 +102,10 @@ authorized_packages = {pyaskalono = ">=0.2.0"}
 level = "cautious"
 unauthorized_licenses = []
 
+[tool.pytest.ini_options]
+pythonpath = ["src", "."]
+testpaths = ["tests"]
+
 [tool.ruff]
 line-length = 88
 target-version = "py312"
@@ -115,5 +121,6 @@ source-include = [
   "LICENSES/**",
   "REUSE.toml",
   "uv.lock",
-  "settings-override.py"
+  "settings-override.py",
+  "tests/**"
 ]

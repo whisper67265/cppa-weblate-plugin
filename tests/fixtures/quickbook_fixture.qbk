@@ -1,0 +1,89 @@
+[/
+    Synthetic fixture for QuickBook parser tests.
+    Patterns adapted from Beast documentation (sections,
+    headings, tables with code fences, variablelist, admonitions, links).
+]
+
+[section:complex_fixture Complex QuickBook test fixture]
+
+This opening paragraph soft-wraps onto a second line while keeping an
+inline [@https://example.com/path RFC-style link] and a named
+[link beast.ref.boost__beast__http__message `message`] reference in the
+same paragraph block.
+
+[h2 Section headings and lists]
+
+* First bullet names [link beast.ref.boost__beast__http__request `request`].
+* Second bullet continues the list with plain prose.
+
+[#anchor_skipped]
+
+[heading:custom Custom heading with id]
+
+[:This is a single-line blockquote for translation.]
+
+[note
+This is a multi-line admonition body. It contains a paragraph that should
+still be extracted when the note block is parsed recursively.
+
+A second paragraph inside the same note uses [@https://tools.ietf.org/html/rfc6455 WebSocket] markup.
+]
+
+[section:nested_inner Nested section title here]
+
+Inner section prose explains that `template` parameters accept any
+[link beast.ref.boost__beast__http__fields `fields`] type meeting requirements.
+The paragraph joins wrapped source lines into one translatable unit.
+
+    // This indented line starts a code block (non-translatable).
+    // It must not become its own translation unit.
+
+After the code block, prose resumes with a dollar image that is skipped:
+[$beast/images/message.png [width 100px] [height 50px]]
+
+[endsect]
+
+[table Message patterns
+[[Name][Description]]
+[[
+    __message__
+][
+    ```
+    /// Class template overview
+    template<class Body, class Fields>
+    class message;
+    ```
+]]
+[[
+    [link beast.ref.boost__beast__http__request `request`]
+][
+    ```
+    /// HTTP request alias
+    template<class Body, class Fields = fields>
+    using request = message<true, Body, Fields>;
+    ```
+]]
+[[Plain prose cell][
+    This cell has human-readable text only, without a code fence.
+]]
+]
+
+[variablelist FAQ-style entries
+[[
+    "Does this fixture include a variablelist?"
+][
+    Yes. This pair mimics patterns from the FAQ chapter: quoted question
+    strings and multi-sentence answers with blank-line-separated paragraphs.
+
+    Second paragraph in the same answer cell.
+]]
+[[
+    "What about table titles?"
+][
+    The table above includes an explicit title line after the opening bracket.
+]]
+]
+
+[warning This is a one-line warning about edge cases in handshakes.]
+
+[endsect]

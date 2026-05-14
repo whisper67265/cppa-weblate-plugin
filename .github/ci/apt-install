@@ -1,0 +1,39 @@
+#!/bin/sh
+
+# SPDX-FileCopyrightText: 2026 Andrew Zhang <whisper67265@outlook.com>
+#
+# SPDX-License-Identifier: BSL-1.0
+#
+# System packages for installing Weblate and native extensions in CI (Debian/Ubuntu).
+# https://docs.weblate.org/en/latest/admin/install/venv-debian.html#system-requirements
+
+set -e -x
+
+apt-get update
+
+apt-get install -y --no-install-recommends \
+  build-essential \
+  git \
+  gir1.2-pango-1.0 \
+  gir1.2-rsvg-2.0 \
+  libcairo-dev \
+  libffi-dev \
+  libgirepository-2.0-dev \
+  libacl1-dev \
+  liblz4-dev \
+  libzstd-dev \
+  libxxhash-dev \
+  libssl-dev \
+  libpq-dev \
+  libjpeg-dev \
+  libxml2-dev \
+  libxslt-dev \
+  libfreetype6-dev \
+  libyaml-dev \
+  libz-dev \
+  python3-dev \
+  python3-gdbm \
+  libldap2-dev \
+  libldap-common \
+  libsasl2-dev \
+  libxmlsec1-dev
