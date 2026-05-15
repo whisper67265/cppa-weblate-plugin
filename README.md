@@ -6,29 +6,110 @@ SPDX-License-Identifier: BSL-1.0
 
 # cppa-weblate-plugin
 
-## Development
+## Overview
 
-This repository uses [uv](https://docs.astral.sh/uv/) for environments and [prek](https://pypi.org/project/prek/) (a Rust hook manager that reads `.pre-commit-config.yaml`) to run the same hooks as CI locally.
+**cppa-weblate-plugin** is a small Python package (`boost_weblate` on import, `cppa-weblate-plugin` on PyPI) that extends [Weblate](https://weblate.org/) with formats needed for **Boost C++ Libraries** documentation translation. Today it implements **QuickBook** (`.qbk`): a monolingual convert pipeline that extracts translatable prose into Gettext-style workflows and writes translations back into the original template.
 
-Install dependencies including the hook runner:
+**Why a plugin instead of a Weblate fork?** A fork must be rebased across upstream security fixes, releases, and dependency changes. Shipping **stock Weblate** (PyPI or the official image) plus this plugin keeps you on the supported upgrade path while still teaching Weblate how to parse and serialize QuickBook. Customization lives in versioned Python code and a single settings hook, not in a divergent Weblate tree.
+
+**Supported formats**
+
+| Format     | Module | Status   |
+| ---------- | ------ | -------- |
+| QuickBook  | `boost_weblate.formats.quickbook` | Implemented |
+
+Additional formats should follow the same split: a thin class under `src/boost_weblate/formats/` that plugs into Weblate’s format APIs, with parsing and reconstruction under `src/boost_weblate/utils/`.
+
+## Quickstart
+
+Clone the repository, create a local virtual environment with [uv](https://docs.astral.sh/uv/), activate it, and install the package in editable mode with development dependencies (hook runner and test tooling):
 
 ```bash
-uv sync --group pre-commit
+git clone https://github.com/cppalliance/cppa-weblate-plugin.git
+cd cppa-weblate-plugin
+uv venv
+source .venv/bin/activate
+# Windows (PowerShell): .venv\Scripts\Activate.ps1
+uv pip install -e '.[dev]'
 ```
 
-Run every hook on the whole tree:
+Run the test suite:
 
 ```bash
-uv run --only-group pre-commit prek run --all-files --show-diff-on-failure
+pytest
 ```
 
-Install Git commit hooks so hooks run on each commit:
+Run the same checks CI uses (lint, reuse, workflow lint, and pytest via [prek](https://pypi.org/project/prek/) reading `.pre-commit-config.yaml`):
 
 ```bash
-uv run --only-group pre-commit prek install
+prek run --all-files --show-diff-on-failure
 ```
 
-If you use the classic `pre-commit` CLI instead of prek, install it separately and run `pre-commit install` after `uv sync`.
+Install Git hooks so those checks run on each commit:
+
+```bash
+prek install
+```
+
+**Alternative with uv groups:** if you prefer a project-local environment managed entirely by uv, `uv sync --group pre-commit` installs the hook runner and pytest into the uv environment; then use `uv run --only-group pre-commit prek run --all-files --show-diff-on-failure` and `uv run --only-group pre-commit prek install`. If you use the classic `pre-commit` CLI instead of prek, install it separately and run `pre-commit install` after syncing dependencies.
+
+## Architecture
+
+Weblate discovers formats by **import path** (see [WEBLATE_FORMATS config](#weblate_formats-configuration)). This repository keeps a clear boundary between “what Weblate sees” and “how a file format works.”
+
+```mermaid
+flowchart TB
+  subgraph weblate["Weblate"]
+    WF["WEBLATE_FORMATS"]
+    CF["ConvertFormat / store"]
+  end
+  subgraph plugin["boost_weblate"]
+    FMT["formats/ — format adapters"]
+    UTL["utils/ — parse & serialize"]
+    TST["tests/ — mirrors src layout"]
+  end
+  WF --> FMT
+  FMT --> CF
+  FMT --> UTL
+  TST -.-> FMT
+  TST -.-> UTL
+```
+
+- **`src/boost_weblate/formats/`** — Weblate-facing **format classes** (subclasses of Weblate’s `BaseFormat` family, such as `weblate.formats.convert.ConvertFormat`). `QuickBookFormat` follows the same pattern as built-in convert formats (for example AsciiDoc): it turns a template file into a translation store and, on save, applies translations back using the template plus the store.
+
+- **`src/boost_weblate/utils/`** — **Format-specific logic** with no Weblate import cycle: QuickBook parsing, segment extraction, translate-toolkit storage (`QuickBookFile` / `QuickBookUnit`), and reconstruction (`QuickBookTranslator`). New formats should add a sibling module (or package) here.
+
+- **`tests/`** — **Pytest** layout mirrors `formats/` and `utils/` (`tests/formats/`, `tests/utils/`). Shared fixtures live under `tests/fixtures/`. `tests/conftest.py` configures `sys.path`, sets `DJANGO_SETTINGS_MODULE` to `tests.django_qbk_format_settings`, and calls `django.setup()` so format tests can load Weblate’s Django stack without requiring PostgreSQL.
+
+## WEBLATE_FORMATS configuration
+
+Weblate’s settings define `WEBLATE_FORMATS` as a tuple of **dotted import paths** to format classes. The official Docker image evaluates a single optional file after base settings: if `/app/data/settings-override.py` exists, it is compiled and executed with `exec()` in the **same namespace** as the rest of `weblate.settings_docker`, so `WEBLATE_FORMATS` is already defined and you **extend** it rather than replacing it.
+
+This repository ships `settings-override.py` as a copy-paste / image-layer snippet:
+
+```python
+WEBLATE_FORMATS += (  # noqa: F821  # defined by Weblate before exec()
+    "boost_weblate.formats.quickbook.QuickBookFormat",
+)
+```
+
+**Operators:** ensure the plugin package is installed in the Weblate environment (`pip` / image layer), then install the override file where Weblate expects it. For the stock Docker layout:
+
+```dockerfile
+COPY settings-override.py /app/data/settings-override.py
+```
+
+That path is fixed; Weblate does not scan `DATA_DIR` for arbitrary override files. The override file is **not** the same as `WEBLATE_PY_PATH` / `python/customize` (importable customization on `sys.path`); for format registration, use this exec hook unless your image explicitly imports another settings module. See the comments in `settings-override.py` for the full distinction.
+
+**Adding another format:** implement a new class under `boost_weblate.formats`, append its dotted path as another tuple element (trailing comma is fine), redeploy, and restart Weblate so settings are reloaded.
+
+## Contributing
+
+- **Hooks:** use prek (or classic pre-commit) with `.pre-commit-config.yaml` so local runs match CI (Ruff, YAML/TOML checks, REUSE, actionlint, pytest).
+
+- **Tests:** add tests next to the code you touch (`tests/formats/` or `tests/utils/`). Keep `django.setup()`-friendly patterns; heavy DB or migration suites are intentionally avoided in the bundled Django test settings.
+
+- **Pull requests:** open PRs against the default branch on GitHub. Keep changes focused; ensure CI is green (build/wheel checks, lint, tests). Respond to review feedback on the PR thread; for design questions or bug reports, use [Issues](https://github.com/cppalliance/cppa-weblate-plugin/issues).
 
 ## License
 
