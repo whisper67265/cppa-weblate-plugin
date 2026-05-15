@@ -121,6 +121,5 @@ source-include = [
   "LICENSES/**",
   "REUSE.toml",
   "uv.lock",
-  "settings-override.py",
   "tests/**"
 ]

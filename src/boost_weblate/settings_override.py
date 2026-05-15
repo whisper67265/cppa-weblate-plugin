@@ -23,12 +23,21 @@
 #   ``customize.settings_override``; use the path below unless your Dockerfile extends
 #   ``weblate.settings_docker`` to load another module explicitly.
 #
-# CD / image build — copy this repo file to the path Weblate execs (official Docker):
+# CD / image build — copy this file to the path Weblate execs (official Docker). The
+# wheel exposes it as ``boost_weblate/settings_override.py`` (underscore: valid Python
+# module path); Weblate still loads only ``…/settings-override.py`` (hyphen) on disk:
 #
-#     COPY settings-override.py /app/data/settings-override.py
+#     COPY …/site-packages/boost_weblate/settings_override.py
+#         /app/data/settings-override.py
 #
-# Build context: include this file from the plugin checkout (repo name uses a hyphen).
+# From a plugin source checkout, ``COPY src/boost_weblate/settings_override.py`` with
+# the same destination also works.
 
 WEBLATE_FORMATS += (  # noqa: F821  # defined by Weblate before exec()
     "boost_weblate.formats.quickbook.QuickBookFormat",
 )
+
+# Plugin Django app (``boost_weblate.endpoint``): registers ``/boost-endpoint/`` URLs
+# from ``AppConfig.ready()``. The full config class path matches ``WEBLATE_ADD_APPS``
+# style installs (e.g. ``WEBLATE_ADD_APPS=boost_weblate.endpoint`` in Docker).
+INSTALLED_APPS += ("boost_weblate.endpoint.apps.BoostEndpointConfig",)  # noqa: F821
