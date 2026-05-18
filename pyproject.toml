@@ -35,7 +35,7 @@ classifiers = [
   "Topic :: Software Development :: Localization"
 ]
 dependencies = [
-  "Weblate==5.17.1"
+  "Weblate==2026.5"
 ]
 description = "Standalone Weblate plugin for Boost documentation translation."
 keywords = [
