@@ -35,7 +35,7 @@ classifiers = [
   "Topic :: Software Development :: Localization"
 ]
 dependencies = [
-  "Weblate>=5.16.0"
+  "Weblate==5.16.1"
 ]
 description = "Standalone Weblate plugin for Boost documentation translation."
 keywords = [
@@ -120,6 +120,7 @@ source-include = [
   "docs/**",
   "LICENSES/**",
   "REUSE.toml",
+  "scripts/**",
   "uv.lock",
   "tests/**"
 ]
