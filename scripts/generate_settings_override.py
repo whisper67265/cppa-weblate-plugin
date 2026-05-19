@@ -158,8 +158,6 @@ def generate(*, dry_run: bool = False) -> str:
     tuple_block = "\n".join(_render_weblate_formats_tuple_lines(full))
     head = _SETTINGS_OVERRIDE_TEMPLATE.format(tuple_block=tuple_block).rstrip()
     content = head + "\n\n" + _installed_apps_plugin_block() + "\n"
-    if not content.endswith("\n"):
-        content += "\n"
     out = _repo_root() / "src" / "boost_weblate" / "settings_override.py"
     if not dry_run:
         out.write_text(content, encoding="utf-8")

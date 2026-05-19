@@ -27,19 +27,25 @@ def _load_generator_module():
     return mod
 
 
-def _weblate_formats_from_repo_settings_override() -> list[str]:
-    path = (
-        Path(__file__).resolve().parents[1] / "src/boost_weblate/settings_override.py"
-    )
-    tree = ast.parse(path.read_text(encoding="utf-8"))
+def _weblate_formats_from_settings_override_source(source: str) -> list[str]:
+    tree = ast.parse(source)
     for node in tree.body:
         if not isinstance(node, ast.Assign):
             continue
         for target in node.targets:
             if isinstance(target, ast.Name) and target.id == "WEBLATE_FORMATS":
                 return _ast_tuple_of_strings(node.value)
-    msg = "WEBLATE_FORMATS assignment not found in generated settings_override.py"
+    msg = "WEBLATE_FORMATS assignment not found in settings override source"
     raise AssertionError(msg)
+
+
+def _weblate_formats_from_repo_settings_override() -> list[str]:
+    path = (
+        Path(__file__).resolve().parents[1] / "src/boost_weblate/settings_override.py"
+    )
+    return _weblate_formats_from_settings_override_source(
+        path.read_text(encoding="utf-8")
+    )
 
 
 def _ast_tuple_of_strings(node: ast.expr) -> list[str]:
@@ -74,7 +80,8 @@ def test_generated_weblate_formats_includes_upstream_and_quickbook() -> None:
     assert paths.count(_QBK) == 1
 
 
-def test_generator_final_paths_dedupes_quickbook() -> None:
-    gen = _load_generator_module()
-    merged = gen._final_weblate_format_paths(["weblate.formats.ttkit.PoFormat", _QBK])
-    assert merged.count(_QBK) == 1
+def test_generator_output_includes_quickbook_once() -> None:
+    mod = _load_generator_module()
+    paths = _weblate_formats_from_settings_override_source(mod.generate(dry_run=True))
+    assert "weblate.formats.ttkit.PoFormat" in paths
+    assert paths.count(_QBK) == 1
