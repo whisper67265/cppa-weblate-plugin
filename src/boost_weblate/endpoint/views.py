@@ -4,6 +4,8 @@
 
 from __future__ import annotations
 
+import logging
+
 from django.http import HttpResponse
 from django.views.decorators.http import require_GET
 from rest_framework import status
@@ -13,6 +15,8 @@ from rest_framework.views import APIView
 
 from boost_weblate.endpoint.serializers import AddOrUpdateRequestSerializer
 from boost_weblate.endpoint.services import BoostComponentService
+
+logger = logging.getLogger(__name__)
 
 
 @require_GET
@@ -79,9 +83,14 @@ class AddOrUpdateView(APIView):
                 {"detail": str(exc)},
                 status=status.HTTP_501_NOT_IMPLEMENTED,
             )
-        except Exception as exc:
+        except Exception:
+            logger.exception(
+                "boost_weblate.endpoint.AddOrUpdateView: add-or-update failed "
+                "(organization=%s)",
+                organization,
+            )
             return Response(
-                {"error": str(exc)},
+                {"error": "Internal server error"},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 

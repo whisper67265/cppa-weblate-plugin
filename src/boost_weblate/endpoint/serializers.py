@@ -6,6 +6,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 from rest_framework import serializers
 
 
@@ -41,3 +43,22 @@ class AddOrUpdateRequestSerializer(serializers.Serializer):
             "If None or empty, all Weblate-supported extensions are used."
         ),
     )
+
+    def validate_add_or_update(self, value: dict[str, Any]) -> dict[str, Any]:
+        """Require a non-empty list of submodule names for every language key."""
+        errors: dict[str, str] = {}
+        for lang_code, submodules in value.items():
+            if not isinstance(submodules, list):
+                errors[str(lang_code)] = (
+                    "add_or_update: each value must be a non-empty list of submodule "
+                    f"names; key {lang_code!r} is not a list "
+                    f"(got {type(submodules).__name__})."
+                )
+            elif len(submodules) == 0:
+                errors[str(lang_code)] = (
+                    "add_or_update: each value must be a non-empty list of submodule "
+                    f"names; key {lang_code!r} has an empty list."
+                )
+        if errors:
+            raise serializers.ValidationError(errors)
+        return value
