@@ -33,7 +33,7 @@ class AddOrUpdateRequestSerializer(serializers.Serializer):
         help_text="Boost version (e.g., 'boost-1.90.0')",
     )
     extensions = serializers.ListField(
-        child=serializers.CharField(allow_blank=True),
+        child=serializers.CharField(),
         required=False,
         allow_null=True,
         default=None,
