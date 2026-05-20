@@ -85,13 +85,7 @@ flowchart TB
 
 Weblate discovers formats from the `WEBLATE_FORMATS` setting (see `FileFormatLoader` in upstream `weblate.formats.models`). The official Docker image evaluates a single optional file after base settings: if `/app/data/settings-override.py` exists, it is compiled and executed with `exec()` in the **same namespace** as the rest of `weblate.settings_docker`.
 
-Stock `weblate.settings_docker` does **not** always bind `WEBLATE_FORMATS` in that namespace before the hook runs, so a bare `WEBLATE_FORMATS += (...)` in the override can raise `NameError`. This repository **generates** `src/boost_weblate/settings_override.py` with a literal ``WEBLATE_FORMATS = (…,)`` (upstream ``FormatsConf.FORMATS`` plus QuickBook, merged in ``scripts/generate_settings_override.py`` at **build/dev time**) and the endpoint ``INSTALLED_APPS += (…,)`` block described in that script. Regenerate whenever you bump the Weblate pin:
-
-```bash
-uv sync && uv run python scripts/generate_settings_override.py
-```
-
-That assignment **replaces** ``WEBLATE_FORMATS`` for the process with the frozen full list. The same generated file appends the endpoint Django app via ``INSTALLED_APPS += ("boost_weblate.endpoint.apps.BoostEndpointConfig",)`` (see comments there). If you also set ``WEBLATE_ADD_APPS`` to the same app, remove one source to avoid duplicate ``INSTALLED_APPS`` entries.
+Stock `weblate.settings_docker` does **not** always bind `WEBLATE_FORMATS` in that namespace before the hook runs, so a bare `WEBLATE_FORMATS += (...)` in the override can raise `NameError`. This repository ships ``src/boost_weblate/settings_override.py`` as the Docker ``exec()`` fragment: it assigns ``WEBLATE_FORMATS`` by **reading** upstream ``weblate/formats/models.py`` and regex-slicing ``FormatsConf.FORMATS`` (aligned with the installed Weblate version without importing ``weblate.formats.models`` during settings load, which can raise ``AppRegistryNotReady``). It appends the endpoint Django app via ``INSTALLED_APPS += ("boost_weblate.endpoint.apps.BoostEndpointConfig",)``. If you also set ``WEBLATE_ADD_APPS`` to the same app, remove one source to avoid duplicate ``INSTALLED_APPS`` entries.
 
 **Operators:** ensure the plugin package is installed in the Weblate environment (`pip` / image layer), then install the override file where Weblate expects it. For the stock Docker layout:
 
@@ -101,7 +95,7 @@ COPY settings-override.py /app/data/settings-override.py
 
 That path is fixed; Weblate does not scan `DATA_DIR` for arbitrary override files. The override file is **not** the same as `WEBLATE_PY_PATH` / `python/customize` (importable customization on `sys.path`); for format registration, use this exec hook unless your image explicitly imports another settings module. See the comments in `settings_override.py` for the full distinction.
 
-**Adding another format:** implement the class under `boost_weblate.formats`, extend ``_final_weblate_format_paths()`` / tuple rendering in ``scripts/generate_settings_override.py`` if needed, regenerate ``settings_override.py`` with the command above (or hand-edit the generated tuple only if you accept drift from upstream), redeploy, and restart Weblate.
+**Adding another format:** implement the class under `boost_weblate/formats/`, append its dotted class path in ``weblate_formats_with_quickbook()`` (or extend the tuple built there), redeploy, and restart Weblate. If upstream changes the layout of ``FormatsConf`` in ``models.py``, update the regex in ``settings_override.py`` accordingly.
 
 ## Contributing
 

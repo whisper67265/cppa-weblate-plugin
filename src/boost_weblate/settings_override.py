@@ -2,119 +2,69 @@
 #
 # SPDX-License-Identifier: BSL-1.0
 
-# ** GENERATED FILE — do not edit by hand. **
-# Regenerate after changing the pinned Weblate version in ``pyproject.toml``:
-#
-#     uv sync && uv run python scripts/generate_settings_override.py
-#
-# QuickBook format registration for cppa-weblate-plugin (upstream Weblate from PyPI
-# plus pip install). ``WEBLATE_FORMATS`` below is the full list: upstream
-# ``FormatsConf.FORMATS`` for the Weblate version used to run the generator, plus
-# ``boost_weblate.formats.quickbook.QuickBookFormat`` (see script docstring).
-#
-# Relationship to Weblate Docker settings (see ``weblate.settings_docker``):
-# - After environment variables are applied, Weblate sets ``ADDITIONAL_CONFIG`` to a
-#   fixed path (upstream: ``Path("/app/data/settings-override.py")``) and, if that file
-#   exists, compiles the file and runs it with ``exec()`` in the *same* namespace as
-#   the rest of ``settings_docker``. There is no directory walk or pattern match under
-#   ``DATA_DIR`` / ``WEBLATE_DATA_DIR`` for this hook—only that single file path.
-# - ``DATA_DIR`` (default ``/app/data`` via ``WEBLATE_DATA_DIR``) is the data volume
-#   root; the override file lives beside it as ``…/settings-override.py`` (hyphen),
-#   not inside ``…/python/customize/`` unless your own image wires an extra import.
-#
-# ``/app/data/python/customize`` (``WEBLATE_PY_PATH`` in the official container):
-# - The ``customize`` Django app (first in ``INSTALLED_APPS``) is for importable
-#   customization code, static files, and templates on ``sys.path``—parallel to the
-#   exec hook above, not a substitute for it. Stock Weblate does not auto-import
-#   ``customize.settings_override``; use the path below unless your Dockerfile extends
-#   ``weblate.settings_docker`` to load another module explicitly.
-#
-# CD / image build — copy this file to the path Weblate execs (official Docker). The
-# wheel exposes it as ``boost_weblate/settings_override.py`` (underscore: valid Python
-# module path); Weblate still loads only ``…/settings-override.py`` (hyphen) on disk:
-#
-#     COPY …/site-packages/boost_weblate/settings_override.py \
-#         /app/data/settings-override.py
-#
-# From a plugin source checkout, ``COPY src/boost_weblate/settings_override.py`` with
-# the same destination also works.
-#
-# Generated tail: ``WEBLATE_FORMATS`` tuple, then ``INSTALLED_APPS`` for the
-# endpoint app.
+"""Docker ``settings-override.py`` fragment for QuickBook and the Boost endpoint app.
 
-WEBLATE_FORMATS = (
-    "weblate.formats.ttkit.PoFormat",
-    "weblate.formats.ttkit.PoMonoFormat",
-    "weblate.formats.ttkit.TSFormat",
-    "weblate.formats.ttkit.XliffFormat",
-    "weblate.formats.ttkit.RichXliffFormat",
-    "weblate.formats.ttkit.Xliff2Format",
-    "weblate.formats.ttkit.RichXliff2Format",
-    "weblate.formats.ttkit.PoXliffFormat",
-    "weblate.formats.ttkit.AppleXliffFormat",
-    "weblate.formats.ttkit.StringsFormat",
-    "weblate.formats.ttkit.PropertiesFormat",
-    "weblate.formats.ttkit.JoomlaFormat",
-    "weblate.formats.ttkit.GWTFormat",
-    "weblate.formats.ttkit.PhpFormat",
-    "weblate.formats.ttkit.LaravelPhpFormat",
-    "weblate.formats.ttkit.RESXFormat",
-    "weblate.formats.ttkit.AndroidFormat",
-    "weblate.formats.ttkit.MOKOFormat",
-    "weblate.formats.ttkit.CMPFormat",
-    "weblate.formats.ttkit.JSONFormat",
-    "weblate.formats.ttkit.JSONNestedFormat",
-    "weblate.formats.ttkit.WebExtensionJSONFormat",
-    "weblate.formats.ttkit.I18NextFormat",
-    "weblate.formats.ttkit.CatkeysFormat",
-    "weblate.formats.ttkit.I18NextV4Format",
-    "weblate.formats.ttkit.GoI18JSONFormat",
-    "weblate.formats.ttkit.GoI18V2JSONFormat",
-    "weblate.formats.ttkit.GoTextFormat",
-    "weblate.formats.ttkit.ARBFormat",
-    "weblate.formats.ttkit.FormatJSFormat",
-    "weblate.formats.ttkit.CSVFormat",
-    "weblate.formats.ttkit.CSVSimpleFormat",
-    "weblate.formats.ttkit.YAMLFormat",
-    "weblate.formats.ttkit.RubyYAMLFormat",
-    "weblate.formats.ttkit.SubRipFormat",
-    "weblate.formats.ttkit.MicroDVDFormat",
-    "weblate.formats.ttkit.AdvSubStationAlphaFormat",
-    "weblate.formats.ttkit.SubStationAlphaFormat",
-    "weblate.formats.ttkit.DTDFormat",
-    "weblate.formats.ttkit.FlatXMLFormat",
-    "weblate.formats.ttkit.ResourceDictionaryFormat",
-    "weblate.formats.ttkit.INIFormat",
-    "weblate.formats.ttkit.InnoSetupINIFormat",
-    "weblate.formats.ttkit.PropertiesMi18nFormat",
-    "weblate.formats.external.XlsxFormat",
-    "weblate.formats.txt.AppStoreFormat",
-    "weblate.formats.convert.HTMLFormat",
-    "weblate.formats.convert.IDMLFormat",
-    "weblate.formats.convert.OpenDocumentFormat",
-    "weblate.formats.convert.PlainTextFormat",
-    "weblate.formats.convert.DokuWikiFormat",
-    "weblate.formats.convert.MarkdownFormat",
-    "weblate.formats.convert.MDXFormat",
-    "weblate.formats.convert.MediaWikiFormat",
-    "weblate.formats.convert.WindowsRCFormat",
-    "weblate.formats.convert.AsciiDocFormat",
-    "weblate.formats.convert.WXLFormat",
-    "weblate.formats.ttkit.XWikiPropertiesFormat",
-    "weblate.formats.ttkit.XWikiPagePropertiesFormat",
-    "weblate.formats.ttkit.XWikiFullPageFormat",
-    "weblate.formats.ttkit.TBXFormat",
-    "weblate.formats.ttkit.StringsdictFormat",
-    "weblate.formats.ttkit.FluentFormat",
-    "weblate.formats.ttkit.GoI18nTOMLFormat",
-    "weblate.formats.ttkit.TOMLFormat",
-    "weblate.formats.ttkit.RESJSONFormat",
-    "weblate.formats.ttkit.NextcloudJSONFormat",
-    "weblate.formats.multi.MultiCSVFormat",
-    "boost_weblate.formats.quickbook.QuickBookFormat",
+Weblate's official image runs this file with ``exec()`` in the same namespace as
+``weblate.settings_docker`` (see upstream ``ADDITIONAL_CONFIG``). Copy this module to
+``/app/data/settings-override.py`` (hyphen on disk) or keep it on ``PYTHONPATH`` and
+point your image at the same content.
+
+``WEBLATE_FORMATS`` is built by **reading** ``weblate/formats/models.py`` as text and
+regex-slicing ``FormatsConf.FORMATS``. That avoids ``import weblate.formats.models``,
+which pulls in Django ORM classes during settings import and raises
+``AppRegistryNotReady``. The slice is **layout-sensitive**: it assumes ``FORMATS = (``
+inside ``FormatsConf`` is followed by ``class Meta:`` at the same indent; if upstream
+reformats that class, update the pattern here.
+
+``INSTALLED_APPS`` is extended via ``globals().get("INSTALLED_APPS")`` when this file
+is ``exec``'d (Docker): the list exists in the settings namespace. Importing this
+module for tests still defines ``WEBLATE_FORMATS`` on the module without mutating
+Django settings.
+"""
+
+from __future__ import annotations
+
+import re
+from pathlib import Path
+
+# Package ``__init__`` is empty; does not import ``formats.models``.
+import weblate.formats
+
+_QUICKBOOK_FORMAT = "boost_weblate.formats.quickbook.QuickBookFormat"
+_ENDPOINT_APP_CONFIG = "boost_weblate.endpoint.apps.BoostEndpointConfig"
+
+_FORMATS_BLOCK = re.compile(
+    r"^\s{4}FORMATS\s*=\s*\(([\s\S]*?)\)\s*\n\s{4}class Meta:",
+    re.MULTILINE,
 )
+_STRING_LITERAL = re.compile(r'"([^"\\]*)"(?:\s*,|\s*$)', re.MULTILINE)
 
-# Plugin Django app (``boost_weblate.endpoint``): registers ``/boost-endpoint/`` URLs
-# from ``AppConfig.ready()``. The full config class path matches ``WEBLATE_ADD_APPS``
-# style installs (e.g. ``WEBLATE_ADD_APPS=boost_weblate.endpoint`` in Docker).
-INSTALLED_APPS += ("boost_weblate.endpoint.apps.BoostEndpointConfig",)  # noqa: F821
+
+def weblate_formats_with_quickbook() -> tuple[str, ...]:
+    """Upstream ``FormatsConf.FORMATS`` paths plus QuickBook.
+
+    Avoids importing ``weblate.formats.models``.
+    """
+    models_py = Path(weblate.formats.__file__).resolve().parent / "models.py"
+    src = models_py.read_text(encoding="utf-8")
+    m = _FORMATS_BLOCK.search(src)
+    if not m:
+        msg = f"boost_weblate: could not parse FormatsConf.FORMATS from {models_py}"
+        raise RuntimeError(msg)
+    body = m.group(1)
+    core = tuple(
+        p for p in _STRING_LITERAL.findall(body) if p.startswith("weblate.formats.")
+    )
+    if not core:
+        msg = f"boost_weblate: no format paths parsed from {models_py}"
+        raise RuntimeError(msg)
+    if _QUICKBOOK_FORMAT in core:
+        return core
+    return core + (_QUICKBOOK_FORMAT,)
+
+
+WEBLATE_FORMATS = weblate_formats_with_quickbook()
+
+_INSTALLED_APPS = globals().get("INSTALLED_APPS")
+if _INSTALLED_APPS is not None:
+    _INSTALLED_APPS += (_ENDPOINT_APP_CONFIG,)
