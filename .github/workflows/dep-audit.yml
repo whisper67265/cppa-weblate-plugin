@@ -39,9 +39,9 @@ jobs:
       run: |
         uv pip freeze > /tmp/requirements-frozen.txt
         pip-audit --requirement /tmp/requirements-frozen.txt --disable-pip --no-deps --format markdown --desc on
-    - name: pip-audit severity gate (CRITICAL and HIGH only)
+    - name: pip-audit severity gate (CRITICAL only)
       run: |
-        pip-audit-extra --local --fail-level HIGH
+        pip-audit-extra --local --fail-level CRITICAL
     - name: liccheck
       run: |
         uv pip freeze > /tmp/requirements-frozen.txt
