@@ -17,6 +17,14 @@ _PLUGIN_URLS_ATTR = "_cppa_boost_weblate_urls_registered"
 def register_plugin_urls() -> None:
     """Append this app's routes to Weblate's pattern list.
 
+    This is the supported integration path: at process
+    startup, append a single ``path("boost-endpoint/", ...)`` entry to
+    ``weblate.urls.real_patterns`` so routes stay under Weblate's ``URL_PREFIX``
+    handling.
+
+    Exposed HTTP paths (relative to ``/boost-endpoint/``): ``info/``,
+    ``add-or-update/``, and ``plugin-ping/`` (see ``boost_weblate.endpoint.urls``).
+
     Weblate builds ``urlpatterns`` from module-level ``real_patterns`` (see
     ``weblate.urls``). Optional integrations append to ``real_patterns`` before
     the ``URL_PREFIX`` wrapper is applied, so mutating that list keeps routes
@@ -42,13 +50,22 @@ def register_plugin_urls() -> None:
         return
 
     wl_urls.real_patterns.append(
-        path("boost-endpoint/", include("boost_weblate.endpoint.urls")),
+        path(
+            "boost-endpoint/",
+            include(("boost_weblate.endpoint.urls", "boost_endpoint")),
+        ),
     )
     setattr(wl_urls, _PLUGIN_URLS_ATTR, True)
 
 
 class BoostEndpointConfig(AppConfig):
-    """Registers ``/boost-endpoint/`` on the Weblate URLconf when the app loads."""
+    """Django app config for the Boost documentation translation HTTP API.
+
+    On load, :meth:`ready` calls :func:`register_plugin_urls` once (idempotent) to
+    mount ``/boost-endpoint/`` with ``info/``, ``add-or-update/``, and
+    ``plugin-ping/`` routes (application namespace ``boost_endpoint`` for URL
+    reversing).
+    """
 
     default_auto_field = "django.db.models.BigAutoField"
     name = "boost_weblate.endpoint"
@@ -56,4 +73,8 @@ class BoostEndpointConfig(AppConfig):
     verbose_name = "Boost documentation translation API"
 
     def ready(self) -> None:
+        """Register plugin URL patterns with Weblate.
+
+        Delegates to :func:`register_plugin_urls`.
+        """
         register_plugin_urls()
