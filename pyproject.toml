@@ -98,7 +98,8 @@ authorized_licenses = [
   "ofl",
   "zpl"
 ]
-authorized_packages = {pyaskalono = ">=0.2.0"}
+# google-crc32c: PyPI has no License/classifiers (liccheck UNKNOWN); upstream is Apache-2.0.
+authorized_packages = {pyaskalono = ">=0.2.0", "google-crc32c" = ">=1.8.0"}
 level = "cautious"
 unauthorized_licenses = []
 
