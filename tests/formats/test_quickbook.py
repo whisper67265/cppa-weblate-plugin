@@ -208,6 +208,46 @@ def test_existing_units_merge_orangutan(tmp_path: Path) -> None:
     assert testfile.read_text(encoding="utf-8") == _EXPECTED_AFTER_EXISTING_UNITS
 
 
+def test_convertfile_merge_duplicates_uses_merge_style(tmp_path: Path) -> None:
+    """``merge_duplicates`` selects ``duplicate_style="merge"`` in ``convertfile``."""
+    from boost_weblate.formats.quickbook import QuickBookFormat
+
+    template_path = tmp_path / "tpl_merge.qbk"
+    translation_path = tmp_path / "tr_merge.qbk"
+    template_path.write_text("[h2 One]\n", encoding="utf-8")
+    translation_path.write_text("[h2 Jedna]\n", encoding="utf-8")
+
+    storage = QuickBookFormat(
+        str(translation_path),
+        template_store=QuickBookFormat(str(template_path), is_template=True),
+        file_format_params={"merge_duplicates": True},
+    )
+    assert len(storage.content_units) == 1
+    assert storage.content_units[0].source == "One"
+
+
+def test_save_content_resolves_template_path_via_storefile_name(
+    tmp_path: Path,
+) -> None:
+    """Template ``storefile`` may be a binary handle; ``save`` uses ``.name``."""
+    from boost_weblate.formats.quickbook import QuickBookFormat
+
+    template_path = tmp_path / "tpl_handle.qbk"
+    translation_path = tmp_path / "tr_handle.qbk"
+    template_path.write_text("[h2 Hello]\n", encoding="utf-8")
+    translation_path.write_text("[h2 Ahoj]\n", encoding="utf-8")
+
+    with open(template_path, "rb") as template_file:
+        template_fmt = QuickBookFormat(template_file, is_template=True)
+        storage = QuickBookFormat(
+            str(translation_path),
+            template_store=template_fmt,
+        )
+        storage.save()
+
+    assert translation_path.read_text(encoding="utf-8") == "[h2 Ahoj]\n"
+
+
 def main(argv: list[str]) -> int:
     _bootstrap_django()
 
@@ -233,6 +273,10 @@ def main(argv: list[str]) -> int:
         print("import existing (cs/cs2): OK")
         test_existing_units_merge_orangutan(p)
         print("existing_units merge: OK")
+        test_convertfile_merge_duplicates_uses_merge_style(p)
+        print("merge_duplicates convertfile: OK")
+        test_save_content_resolves_template_path_via_storefile_name(p)
+        print("save_content template storefile.name: OK")
 
     return 0
 

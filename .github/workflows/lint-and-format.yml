@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: 2026 Andrew Zhang <whisper67265@outlook.com>
+# SPDX-FileCopyrightText: 2026 William Jin <AuraMindNest@outlook.com>
 #
 # SPDX-License-Identifier: BSL-1.0
 
@@ -45,3 +45,45 @@ jobs:
       env:
         RUFF_OUTPUT_FORMAT: github
         REUSE_OUTPUT_FORMAT: github
+
+  test-coverage:
+    name: Tests and coverage
+    runs-on: ubuntu-latest
+    steps:
+    # actions/checkout v6.0.2
+    - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+      with:
+        persist-credentials: false
+    # actions/setup-python v6.2.0
+    - name: Setup Python
+      uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
+      with:
+        python-version: '3.14'
+    # astral-sh/setup-uv v8.1.0
+    - uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b
+      with:
+        version: 0.11.12
+    - name: Install apt dependencies (Weblate venv)
+      run: sudo ./.github/ci/apt-install
+    - name: Install dependencies (incl. dev)
+      run: uv sync --frozen --group dev --group pre-commit
+    - name: Pytest with coverage
+      run: >
+        uv run --group dev --group pre-commit pytest -v --tb=short
+        --cov=boost_weblate
+        --cov-report=term-missing
+        --cov-report=xml:coverage.xml
+        --cov-report=html:htmlcov
+        --cov-fail-under=90
+    - name: Coverage report (summary table)
+      run: uv run --group dev coverage report
+    # actions/upload-artifact v4.6.2
+    - name: Upload coverage artifacts
+      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+      with:
+        name: coverage-${{ github.event.pull_request.number || github.run_id }}
+        path: |
+          coverage.xml
+          htmlcov/
+          .coverage
+        if-no-files-found: error

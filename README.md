@@ -39,6 +39,20 @@ Run the test suite:
 pytest
 ```
 
+Run with the same coverage gate as CI (terminal + XML + HTML, 90% minimum on `boost_weblate`):
+
+```bash
+pytest -v --tb=short \
+  --cov=boost_weblate \
+  --cov-report=term-missing \
+  --cov-report=xml:coverage.xml \
+  --cov-report=html:htmlcov \
+  --cov-fail-under=90
+coverage report
+```
+
+(`coverage.xml`, `htmlcov/`, and `.coverage` are gitignored; open `htmlcov/index.html` locally to browse line coverage.)
+
 Run the same checks CI uses (lint, reuse, workflow lint, and pytest via [prek](https://pypi.org/project/prek/) reading `.pre-commit-config.yaml`):
 
 ```bash
@@ -79,7 +93,7 @@ flowchart TB
 
 - **`src/boost_weblate/utils/`** — **Format-specific logic** with no Weblate import cycle: QuickBook parsing, segment extraction, translate-toolkit storage (`QuickBookFile` / `QuickBookUnit`), and reconstruction (`QuickBookTranslator`). New formats should add a sibling module (or package) here.
 
-- **`tests/`** — **Pytest** layout mirrors `formats/` and `utils/` (`tests/formats/`, `tests/utils/`). Shared fixtures live under `tests/fixtures/`. `tests/conftest.py` configures `sys.path`, sets `DJANGO_SETTINGS_MODULE` to `tests.django_qbk_format_settings`, and calls `django.setup()` so format tests can load Weblate’s Django stack without requiring PostgreSQL.
+- **`tests/`** — **Pytest** layout mirrors `src/boost_weblate/` (`tests/formats/`, `tests/utils/`, `tests/endpoint/`). Shared fixtures live under `tests/fixtures/`. `tests/conftest.py` configures `sys.path`, sets `DJANGO_SETTINGS_MODULE` to `tests.django_qbk_format_settings`, and calls `django.setup()` so format tests can load Weblate’s Django stack without requiring PostgreSQL.
 
 ## WEBLATE_FORMATS configuration
 
@@ -101,7 +115,9 @@ That path is fixed; Weblate does not scan `DATA_DIR` for arbitrary override file
 
 - **Hooks:** use prek (or classic pre-commit) with `.pre-commit-config.yaml` so local runs match CI (Ruff, YAML/TOML checks, REUSE, actionlint, pytest).
 
-- **Tests:** add tests next to the code you touch (`tests/formats/` or `tests/utils/`). Keep `django.setup()`-friendly patterns; heavy DB or migration suites are intentionally avoided in the bundled Django test settings.
+- **Tests:** add tests next to the code you touch (`tests/formats/`, `tests/utils/`, or `tests/endpoint/`). Keep `django.setup()`-friendly patterns; heavy DB or migration suites are intentionally avoided in the bundled Django test settings.
+
+- **CI coverage:** the *Lint and format* workflow runs a **Tests and coverage** job that prints `term-missing` output, runs `coverage report`, writes `coverage.xml` and `htmlcov/`, and uploads those plus `.coverage` as a workflow artifact (download from the run’s *Artifacts* section on GitHub). Coverage is configured in `pyproject.toml` (`[tool.coverage.*]`); the job uses `uv sync --frozen --group dev --group pre-commit` so `pytest-cov` and `coverage[toml]` match the lockfile.
 
 - **Pull requests:** open PRs against the default branch on GitHub. Keep changes focused; ensure CI is green (build/wheel checks, lint, tests). Respond to review feedback on the PR thread; for design questions or bug reports, use [Issues](https://github.com/cppalliance/cppa-weblate-plugin/issues).
 

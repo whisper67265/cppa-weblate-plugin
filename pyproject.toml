@@ -7,6 +7,10 @@ build-backend = "uv_build"
 requires = ["uv_build>=0.8.18,<0.12.0"]
 
 [dependency-groups]
+dev = [
+  "coverage[toml]>=7.6.0",
+  "pytest-cov>=7.1.0"
+]
 lint = [
   {include-group = "pre-commit"}
 ]
@@ -56,7 +60,9 @@ version = "0.1.0"
 
 [project.optional-dependencies]
 dev = [
+  "coverage[toml]>=7.6.0",
   "prek==0.3.13",
+  "pytest-cov>=7.1.0",
   "pytest>=8.3"
 ]
 
@@ -71,6 +77,20 @@ ignore = [
   "*.yml",
   ".editorconfig"
 ]
+
+[tool.coverage]
+
+[tool.coverage.report]
+fail_under = 90
+omit = [
+  "*/migrations/*",
+  "*/tests/*",
+  "*/__pycache__/*"
+]
+show_missing = true
+
+[tool.coverage.run]
+source = ["boost_weblate"]
 
 # liccheck: regex on PyPI license classifiers (as_regex).
 [tool.liccheck]
@@ -104,6 +124,8 @@ level = "cautious"
 unauthorized_licenses = []
 
 [tool.pytest.ini_options]
+python_classes = ["Test*"]
+python_files = ["test_*.py", "*_test.py"]
 pythonpath = ["src", "."]
 testpaths = ["tests"]
 

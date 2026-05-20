@@ -13,13 +13,17 @@ point your image at the same content.
 regex-slicing ``FormatsConf.FORMATS``. That avoids ``import weblate.formats.models``,
 which pulls in Django ORM classes during settings import and raises
 ``AppRegistryNotReady``. The slice is **layout-sensitive**: it assumes ``FORMATS = (``
-inside ``FormatsConf`` is followed by ``class Meta:`` at the same indent; if upstream
-reformats that class, update the pattern here.
+inside ``FormatsConf`` (same file) is followed by ``class Meta:`` at the same indent;
+if upstream reformats ``FormatsConf`` or moves ``FORMATS`` / ``Meta``, update
+``_FORMATS_BLOCK`` below.
 
-``INSTALLED_APPS`` is extended via ``globals().get("INSTALLED_APPS")`` when this file
-is ``exec``'d (Docker): the list exists in the settings namespace. Importing this
-module for tests still defines ``WEBLATE_FORMATS`` on the module without mutating
-Django settings.
+When this file is ``exec``'d into Weblate's settings namespace (Docker),
+``INSTALLED_APPS`` is taken from ``globals()`` and extended. Upstream
+``weblate.settings_docker`` uses a **list**; the override appends in place with
+``+=``. Settings that use an **immutable tuple** instead get a new tuple assigned
+back to ``globals()["INSTALLED_APPS"]``. Importing this module without
+``INSTALLED_APPS`` in the namespace (typical unit tests) still defines
+``WEBLATE_FORMATS`` and skips the apps mutation.
 """
 
 from __future__ import annotations
@@ -67,4 +71,9 @@ WEBLATE_FORMATS = weblate_formats_with_quickbook()
 
 _INSTALLED_APPS = globals().get("INSTALLED_APPS")
 if _INSTALLED_APPS is not None:
-    _INSTALLED_APPS += (_ENDPOINT_APP_CONFIG,)
+    # Tuple += creates a new object; assign back so exec namespace / settings see it.
+    # List += mutates in place, matching Weblate/Docker settings namespaces.
+    if isinstance(_INSTALLED_APPS, tuple):
+        globals()["INSTALLED_APPS"] = _INSTALLED_APPS + (_ENDPOINT_APP_CONFIG,)
+    else:
+        _INSTALLED_APPS += (_ENDPOINT_APP_CONFIG,)
