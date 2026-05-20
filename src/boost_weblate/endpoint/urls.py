@@ -10,7 +10,7 @@ from django.urls import path
 
 from boost_weblate.endpoint import views
 
-app_name = "boost_weblate"
+app_name = "boost_endpoint"
 
 urlpatterns = [
     path("info/", views.BoostEndpointInfo.as_view(), name="info"),

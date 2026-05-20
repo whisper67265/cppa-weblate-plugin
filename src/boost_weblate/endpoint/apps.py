@@ -52,7 +52,7 @@ def register_plugin_urls() -> None:
     wl_urls.real_patterns.append(
         path(
             "boost-endpoint/",
-            include(("boost_weblate.endpoint.urls", "boost_weblate")),
+            include(("boost_weblate.endpoint.urls", "boost_endpoint")),
         ),
     )
     setattr(wl_urls, _PLUGIN_URLS_ATTR, True)
@@ -63,7 +63,7 @@ class BoostEndpointConfig(AppConfig):
 
     On load, :meth:`ready` calls :func:`register_plugin_urls` once (idempotent) to
     mount ``/boost-endpoint/`` with ``info/``, ``add-or-update/``, and
-    ``plugin-ping/`` routes (application namespace ``boost_weblate`` for URL
+    ``plugin-ping/`` routes (application namespace ``boost_endpoint`` for URL
     reversing).
     """
 
