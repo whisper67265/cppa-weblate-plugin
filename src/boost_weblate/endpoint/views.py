@@ -66,32 +66,71 @@ class AddOrUpdateView(APIView):
         version = data["version"]
         extensions = data.get("extensions")
 
-        try:
-            results: dict[str, object] = {}
-            for lang_code, submodules in add_or_update.items():
+        languages: dict[str, dict[str, object]] = {}
+        for lang_code, submodules in add_or_update.items():
+            try:
                 service = BoostComponentService(
                     organization=organization,
                     lang_code=lang_code,
                     version=version,
                     extensions=extensions,
                 )
-                results[lang_code] = service.process_all(
-                    submodules, user=request.user, request=request
+                languages[lang_code] = {
+                    "status": "success",
+                    "result": service.process_all(
+                        submodules, user=request.user, request=request
+                    ),
+                }
+            except NotImplementedError as exc:
+                logger.warning(
+                    "boost_weblate.endpoint.AddOrUpdateView: add-or-update not "
+                    "implemented (organization=%s, lang_code=%s): %s",
+                    organization,
+                    lang_code,
+                    exc,
                 )
-        except NotImplementedError as exc:
+                languages[lang_code] = {
+                    "status": "error",
+                    "error": str(exc),
+                    "code": "not_implemented",
+                }
+            except Exception:
+                logger.exception(
+                    "boost_weblate.endpoint.AddOrUpdateView: add-or-update failed "
+                    "(organization=%s, lang_code=%s)",
+                    organization,
+                    lang_code,
+                )
+                languages[lang_code] = {
+                    "status": "error",
+                    "error": "Internal server error",
+                    "code": "internal_error",
+                }
+
+        body: dict[str, object] = {
+            "organization": organization,
+            "languages": languages,
+        }
+        has_success = any(v.get("status") == "success" for v in languages.values())
+        has_error = any(v.get("status") == "error" for v in languages.values())
+
+        if not has_error:
+            return Response(body, status=status.HTTP_200_OK)
+        if has_success and has_error:
+            return Response(body, status=status.HTTP_207_MULTI_STATUS)
+
+        if all(v.get("code") == "not_implemented" for v in languages.values()):
+            first_error = next(
+                str(v["error"])
+                for v in languages.values()
+                if v.get("status") == "error"
+            )
             return Response(
-                {"detail": str(exc)},
+                {"detail": first_error, **body},
                 status=status.HTTP_501_NOT_IMPLEMENTED,
             )
-        except Exception:
-            logger.exception(
-                "boost_weblate.endpoint.AddOrUpdateView: add-or-update failed "
-                "(organization=%s)",
-                organization,
-            )
-            return Response(
-                {"error": "Internal server error"},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            )
 
-        return Response(results, status=status.HTTP_200_OK)
+        return Response(
+            {"error": "Internal server error", **body},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        )

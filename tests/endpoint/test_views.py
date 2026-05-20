@@ -102,6 +102,8 @@ def test_add_or_update_returns_not_implemented_until_service_exists() -> None:
     response = AddOrUpdateView.as_view()(request)
     assert response.status_code == status.HTTP_501_NOT_IMPLEMENTED
     assert "detail" in response.data
+    assert response.data["organization"] == "o"
+    assert response.data["languages"]["ja"]["status"] == "error"
 
 
 def test_add_or_update_internal_error_is_masked(
@@ -129,4 +131,6 @@ def test_add_or_update_internal_error_is_masked(
     )
     response = AddOrUpdateView.as_view()(request)
     assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
-    assert response.data == {"error": "Internal server error"}
+    assert response.data["error"] == "Internal server error"
+    assert response.data["organization"] == "o"
+    assert response.data["languages"]["ja"]["status"] == "error"

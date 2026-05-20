@@ -45,9 +45,15 @@ class AddOrUpdateRequestSerializer(serializers.Serializer):
     )
 
     def validate_add_or_update(self, value: dict[str, Any]) -> dict[str, Any]:
-        """Require a non-empty list of submodule names for every language key."""
+        """Require non-empty string language keys and non-empty submodule lists."""
         errors: dict[str, str] = {}
         for lang_code, submodules in value.items():
+            if not isinstance(lang_code, str) or lang_code.strip() == "":
+                errors[str(lang_code)] = (
+                    "add_or_update: each key must be a non-empty language code; "
+                    f"got {repr(lang_code)}"
+                )
+                continue
             if not isinstance(submodules, list):
                 errors[str(lang_code)] = (
                     "add_or_update: each value must be a non-empty list of submodule "
