@@ -31,7 +31,6 @@ import os
 import shutil
 import subprocess
 import tempfile
-import time
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
@@ -656,8 +655,6 @@ class BoostComponentService:
                 message,
             )
             return False
-
-        time.sleep(settings.BOOST_ENDPOINT_ADD_TRANSLATION_SECONDS)
 
         LOGGER.info("Added language %s to %s", self.lang_code, component.name)
         return True
