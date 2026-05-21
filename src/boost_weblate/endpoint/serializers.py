@@ -44,6 +44,12 @@ class AddOrUpdateRequestSerializer(serializers.Serializer):
         ),
     )
 
+    def validate_extensions(self, value: list[str] | None) -> list[str] | None:
+        """Strip entries and remove blanks so all-empty input does not filter files."""
+        if value is None:
+            return None
+        return [v.strip() for v in value if v.strip()]
+
     def validate_add_or_update(self, value: dict[str, Any]) -> dict[str, Any]:
         """Require non-empty string language keys and non-empty submodule lists."""
         errors: dict[str, str] = {}

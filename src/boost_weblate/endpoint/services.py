@@ -784,6 +784,7 @@ class BoostComponentService:
             "success": False,
             "components_created": 0,
             "components_updated": 0,
+            "components_failed": 0,
             "components_deleted": 0,
             "errors": [],
         }
@@ -817,7 +818,8 @@ class BoostComponentService:
         LOGGER.info("Found %s documentation files in %s", len(configs), submodule)
 
         # Check permissions before creating so no Project is committed when denied
-        project_slug = f"boost-{_submodule_slug(submodule)}-documentation"
+        slug = _submodule_slug(submodule)
+        project_slug = f"boost-{slug}-documentation-{self.lang_code}"
         existing_project = Project.objects.filter(slug=project_slug).first()
         if request is not None and user is not None:
             if existing_project is not None:
@@ -848,6 +850,8 @@ class BoostComponentService:
                     result["components_created"] += 1
                 else:
                     result["components_updated"] += 1
+            else:
+                result["components_failed"] += 1
 
         # Delete components that are not in configs (no longer in repo scan).
         # Never delete glossary components (is_glossary); they are managed by Weblate.
@@ -862,7 +866,15 @@ class BoostComponentService:
                     )
                     result["errors"].append(f"Failed to delete {component.slug}: {e}")
 
-        result["success"] = True
+        any_component_ok = (
+            result["components_created"] + result["components_updated"]
+        ) > 0
+        result["success"] = any_component_ok
+        if not any_component_ok and result["components_failed"]:
+            result["errors"].append(
+                "Failed to create or update every scanned component "
+                f"({result['components_failed']} config(s))"
+            )
         return result
 
     def process_all(
