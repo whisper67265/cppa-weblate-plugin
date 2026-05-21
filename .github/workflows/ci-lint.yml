@@ -1,0 +1,50 @@
+# SPDX-FileCopyrightText: 2026 William Jin <AuraMindNest@outlook.com>
+#
+# SPDX-License-Identifier: BSL-1.0
+
+name: Lint and format
+
+on:
+  pull_request:
+  push:
+    branches:
+    - main
+    - develop
+
+permissions:
+  contents: read
+
+jobs:
+  lint-and-format:
+    runs-on: ubuntu-latest
+
+    steps:
+    # actions/checkout v6.0.2
+    - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+      with:
+        persist-credentials: false
+    # actions/cache v5.0.5
+    - uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae
+      with:
+        path: ~/.cache/prek
+        key: ${{ runner.os }}-${{ runner.arch }}-prek-${{ hashFiles('.pre-commit-config.yaml') }}
+        restore-keys: |
+          ${{ runner.os }}-${{ runner.arch }}-prek-
+    # actions/setup-python v6.2.0
+    - name: Setup Python
+      uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
+      with:
+        python-version: '3.14'
+    # astral-sh/setup-uv v8.1.0
+    - uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b
+      with:
+        version: 0.11.12
+    - name: Install apt dependencies (Weblate venv)
+      run: sudo ./.github/ci/apt-install
+    - name: pre-commit
+      run: |
+        uv run --only-group pre-commit prek run --all-files --show-diff-on-failure
+        uv run --only-group pre-commit prek cache gc
+      env:
+        RUFF_OUTPUT_FORMAT: github
+        REUSE_OUTPUT_FORMAT: github
