@@ -16,7 +16,7 @@ class AddOrUpdateRequestSerializer(serializers.Serializer):
 
     organization = serializers.CharField(
         required=True,
-        help_text="GitHub organization name (e.g., 'CppDigest')",
+        help_text="GitHub organization name",
     )
     add_or_update = serializers.DictField(
         child=serializers.ListField(child=serializers.CharField()),
@@ -33,7 +33,7 @@ class AddOrUpdateRequestSerializer(serializers.Serializer):
         help_text="Boost version (e.g., 'boost-1.90.0')",
     )
     extensions = serializers.ListField(
-        child=serializers.CharField(),
+        child=serializers.CharField(allow_blank=True),
         required=False,
         allow_null=True,
         default=None,
