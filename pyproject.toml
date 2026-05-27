@@ -145,9 +145,11 @@ select = ["E", "F", "I", "UP"]
 module-name = "boost_weblate"
 module-root = "src"
 source-include = [
+  "docker/**",
   "docs/**",
   "LICENSES/**",
   "REUSE.toml",
+  "scripts/**",
   "uv.lock",
   "tests/**"
 ]

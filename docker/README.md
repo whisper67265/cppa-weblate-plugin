@@ -12,5 +12,3 @@ Shared Docker assets for CI and CD.
 docker compose -f docker/docker-compose.yml build
 docker compose -f docker/docker-compose.yml up -d
 ```
-
-Or use the Makefile: `make build && make up`.
