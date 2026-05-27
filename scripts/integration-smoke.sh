@@ -40,4 +40,5 @@ export WEBLATE_COMPOSE_PROJECT="${COMPOSE_PROJECT_NAME}"
 
 echo "=== Running smoke tests ==="
 pip install --quiet pytest
-pytest --override-ini addopts= tests/integration/test_smoke.py -v
+# Do not load tests/conftest.py (Django host setup); integration tests only need pytest + stdlib.
+python -m pytest --confcutdir=tests/integration --override-ini addopts= tests/integration/test_smoke.py -v
