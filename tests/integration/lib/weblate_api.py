@@ -8,14 +8,32 @@ from __future__ import annotations
 
 import json
 import mimetypes
+import os
 import time
 import uuid
 from pathlib import Path
 from typing import Any
 from urllib.error import HTTPError
+from urllib.parse import urlparse
 from urllib.request import Request, urlopen
 
 from tests.integration.lib.http import base_url, http_json
+
+# Weblate blocks localhost/loopback in project.web (SSRF protection).
+_DEFAULT_PROJECT_WEB = "https://example.com/"
+
+
+def project_web_url(live_base_url: str | None = None) -> str:
+    """Return a project ``web`` URL accepted by Weblate in CI/local stacks."""
+    override = os.environ.get("WEBLATE_PROJECT_WEB", "").strip()
+    if override:
+        return override if override.endswith("/") else f"{override}/"
+
+    base = (live_base_url or base_url()).rstrip("/")
+    host = (urlparse(base).hostname or "").lower()
+    if host in {"localhost", "127.0.0.1", "::1"}:
+        return _DEFAULT_PROJECT_WEB
+    return f"{base}/"
 
 
 def _multipart_encode(
@@ -70,7 +88,7 @@ class WeblateAPI:
             body={
                 "name": name,
                 "slug": slug,
-                "web": f"{self._base}/",
+                "web": project_web_url(self._base),
             },
         )
         assert code == 200, f"create_project failed: {code} {body}"
