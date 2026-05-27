@@ -8,10 +8,13 @@
 
 FROM weblate/weblate:latest
 
+# Base image ends with USER 1000; installing into /app/venv requires root.
+USER root
+
 ARG PLUGIN_GIT_URL=https://github.com/cppalliance/cppa-weblate-plugin.git
 ARG PLUGIN_GIT_REF=
 
-RUN /app/venv/bin/pip install --no-cache-dir uv
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 
 COPY src/boost_weblate/settings_override.py /app/data/settings-override.py
 
@@ -24,5 +27,7 @@ RUN set -eux; \
       rm -rf /tmp/plugin-src; \
       git clone --depth 1 --branch "${PLUGIN_GIT_REF}" "${PLUGIN_GIT_URL}" /tmp/plugin-src; \
     fi; \
-    /app/venv/bin/uv pip install --python /app/venv/bin/python /tmp/plugin-src; \
+    uv pip install --python /app/venv/bin/python /tmp/plugin-src; \
     rm -rf /tmp/plugin-src
+
+USER 1000
