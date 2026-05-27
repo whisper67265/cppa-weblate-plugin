@@ -44,7 +44,17 @@ stack_wait_healthy() {
 
 stack_create_token() {
     local user="${1:-admin}"
-    compose exec -T weblate weblate createtoken "$user" | tail -1
+    # Weblate 2026+ removed `weblate createtoken`; issue a DRF token with Weblate's key shape (wlu_/wlp_).
+    compose exec -T -e "WEBLATE_CI_USERNAME=${user}" weblate \
+        weblate shell -c \
+        'import os
+from weblate.auth.models import User
+from rest_framework.authtoken.models import Token
+from weblate.utils.token import get_token
+u = User.objects.get(username=os.environ["WEBLATE_CI_USERNAME"])
+Token.objects.filter(user=u).delete()
+t = Token.objects.create(user=u, key=get_token("wlp" if u.is_bot else "wlu"))
+print(t.key)'
 }
 
 stack_logs() {
