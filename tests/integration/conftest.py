@@ -2,55 +2,71 @@
 #
 # SPDX-License-Identifier: BSL-1.0
 
-"""Shared fixtures for integration tests."""
+"""Shared fixtures for integration tests (smoke + functional)."""
 
 from __future__ import annotations
 
 import os
 from collections.abc import Callable
-from typing import Any
+from pathlib import Path
 
 import pytest
 
-from tests.integration.lib.docker_exec import (
-    docker_exec_python,
-    docker_exec_python_json,
-)
-from tests.integration.lib.http import base_url as _base_url
-from tests.integration.lib.http import http_get
+from tests.integration.lib.docker_exec import docker_exec_python, docker_exec_read_file
+from tests.integration.lib.gh_repo import TestRepoManager, default_repo_name
+from tests.integration.lib.http import base_url
+from tests.integration.lib.weblate_api import WeblateAPI
 
-
-@pytest.fixture(scope="session")
-def api_token() -> str:
-    token = os.environ.get("WEBLATE_API_TOKEN")
-    if not token:
-        pytest.skip("WEBLATE_API_TOKEN not set")
-    return token
+FIXTURES_DIR = Path(__file__).resolve().parent.parent / "fixtures"
+TEST_LANG_CODE = "zh_Hans"
+TEST_BRANCH = f"local-{TEST_LANG_CODE}"
+TEST_VERSION = "test-1.0.0"
 
 
 @pytest.fixture(scope="session")
 def live_base_url() -> str:
-    return _base_url()
+    return base_url()
 
 
 @pytest.fixture(scope="session")
-def authed_get(api_token: str) -> Callable[..., tuple[int, Any]]:  # noqa: E501
-    """GET helper pre-bound with the API token."""
-    token = api_token
-
-    def _get(path: str, **kwargs: Any) -> tuple[int, Any]:
-        return http_get(path, token=token, **kwargs)
-
-    return _get
+def api_token() -> str:
+    token = os.environ.get("WEBLATE_API_TOKEN", "").strip()
+    if not token:
+        pytest.skip("WEBLATE_API_TOKEN is not set")
+    return token
 
 
 @pytest.fixture(scope="session")
 def exec_python() -> Callable[[str], str]:
-    """Execute a Python snippet inside the Weblate container."""
     return docker_exec_python
 
 
 @pytest.fixture(scope="session")
-def exec_python_json() -> Callable[[str], object]:
-    """Execute a Python snippet inside the container and parse JSON output."""
-    return docker_exec_python_json
+def weblate_api(api_token: str, live_base_url: str) -> WeblateAPI:
+    return WeblateAPI(api_token, live_base_url=live_base_url)
+
+
+@pytest.fixture(scope="session")
+def weblate_ssh_pubkey() -> str:
+    pubkey = os.environ.get("WEBLATE_SSH_PUBKEY", "").strip()
+    if pubkey:
+        return pubkey
+    return docker_exec_read_file("/app/data/ssh/id_rsa.pub")
+
+
+@pytest.fixture(scope="session")
+def test_repo(weblate_ssh_pubkey: str) -> TestRepoManager:
+    """Ephemeral GitHub repo with fixture docs and Weblate deploy key."""
+    token = os.environ.get("GH_TEST_REPO_TOKEN", "").strip()
+    if not token:
+        pytest.skip("GH_TEST_REPO_TOKEN is not set")
+
+    repo_name = default_repo_name()
+    manager = TestRepoManager(token, repo_name)
+    try:
+        manager.create_repo()
+        manager.push_fixtures(FIXTURES_DIR, branch=TEST_BRANCH)
+        manager.add_deploy_key(weblate_ssh_pubkey)
+        yield manager
+    finally:
+        manager.delete_repo()

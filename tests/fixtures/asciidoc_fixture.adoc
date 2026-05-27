@@ -1,0 +1,11 @@
+= AsciiDoc integration test fixture
+
+This is a short AsciiDoc document used by integration tests.
+
+== Section one
+
+A paragraph with translatable prose for the functional test suite.
+
+== Section two
+
+Another paragraph to ensure multiple units can be extracted when scanned.
