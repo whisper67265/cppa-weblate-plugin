@@ -48,7 +48,7 @@ class TestQuickBookRoundTrip:
         component_slug = "qbk-fixture"
         weblate_api.create_project("Functional QBK", project_slug)
         # Docfile multipart upload (no empty local VCS template paths).
-        weblate_api.create_component_from_docfile(
+        created = weblate_api.create_component_from_docfile(
             project_slug,
             name="QBK Fixture",
             slug=component_slug,
@@ -57,14 +57,8 @@ class TestQuickBookRoundTrip:
             filemask="doc/*.qbk",
             language_regex=f"^{TEST_LANG_CODE}$",
         )
-        # Add target language for translation workflow
-        code, body = http_json(
-            "POST",
-            f"/api/projects/{project_slug}/components/{component_slug}/translations/",
-            token=weblate_api.token,
-            body={"language_code": TEST_LANG_CODE},
-        )
-        assert code in (200, 201), f"add language failed: {code} {body}"
+        component_slug = str(created.get("slug", component_slug))
+        weblate_api.ensure_translation(project_slug, component_slug, TEST_LANG_CODE)
 
         type(self).project_slug = project_slug
         type(self).component_slug = component_slug

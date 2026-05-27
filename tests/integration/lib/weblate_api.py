@@ -254,7 +254,78 @@ class WeblateAPI:
             label="create_component_from_docfile",
         )
         assert isinstance(body, dict)
+        resolved_slug = str(body.get("slug", slug))
+        self.wait_for_component(project_slug, resolved_slug)
         return body
+
+    def wait_for_component(
+        self,
+        project_slug: str,
+        component_slug: str,
+        *,
+        timeout: float = 120.0,
+        interval: float = 2.0,
+    ) -> dict[str, Any]:
+        """Poll until a component is visible (docfile create can be asynchronous)."""
+        deadline = time.monotonic() + timeout
+        last: tuple[int, Any] = (0, None)
+        while time.monotonic() < deadline:
+            code, body = http_json(
+                "GET",
+                f"/api/components/{project_slug}/{component_slug}/",
+                token=self.token,
+            )
+            last = (code, body)
+            if code == 200 and isinstance(body, dict):
+                return body
+            time.sleep(interval)
+        raise TimeoutError(
+            f"Component {project_slug}/{component_slug} not ready after {timeout}s: "
+            f"{last[0]} {last[1]}"
+        )
+
+    def ensure_translation(
+        self,
+        project_slug: str,
+        component_slug: str,
+        language_code: str,
+    ) -> dict[str, Any]:
+        """Ensure a translation exists (idempotent; uses component-scoped API paths)."""
+        self.wait_for_component(project_slug, component_slug)
+        code, body = http_json(
+            "GET",
+            f"/api/components/{project_slug}/{component_slug}/translations/",
+            token=self.token,
+        )
+        assert code == 200, f"list translations failed: {code} {body}"
+        assert isinstance(body, dict)
+        for item in body.get("results", []):
+            if not isinstance(item, dict):
+                continue
+            lang = item.get("language_code")
+            if lang is None:
+                lang_obj = item.get("language")
+                if isinstance(lang_obj, dict):
+                    lang = lang_obj.get("code")
+            if lang == language_code:
+                return item
+
+        code, body = http_json(
+            "POST",
+            f"/api/components/{project_slug}/{component_slug}/translations/",
+            token=self.token,
+            body={"language_code": language_code},
+        )
+        if code in (200, 201) and isinstance(body, dict):
+            result = body.get("result", body)
+            if isinstance(result, dict):
+                return result
+            return body
+        if code == 400 and isinstance(body, (dict, list)):
+            detail = json.dumps(body).lower()
+            if "already exists" in detail:
+                return {"language_code": language_code}
+        raise AssertionError(f"add translation failed: {code} {body}")
 
     def upload_file(
         self,
