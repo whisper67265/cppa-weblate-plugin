@@ -16,6 +16,16 @@ _COMPOSE_PROJECT = os.environ.get("WEBLATE_COMPOSE_PROJECT", "cppa-weblate-plugi
 _PYTHON = "/app/venv/bin/python"
 
 
+def _weblate_django_preamble() -> str:
+    """Weblate format modules need a configured Django app registry."""
+    return (
+        "import os; "
+        'os.environ.setdefault("DJANGO_SETTINGS_MODULE", "weblate.settings_docker"); '
+        "import django; "
+        "django.setup(); "
+    )
+
+
 def _compose_cmd(*args: str) -> list[str]:
     return [
         "docker",
@@ -28,10 +38,12 @@ def _compose_cmd(*args: str) -> list[str]:
     ]
 
 
-def docker_exec_python(snippet: str) -> str:
+def docker_exec_python(snippet: str, *, timeout: float = 120.0) -> str:
     """Run a Python snippet in the weblate container; return stdout (stripped)."""
+    code = _weblate_django_preamble() + snippet
     result = subprocess.run(
-        _compose_cmd("exec", "-T", "weblate", _PYTHON, "-c", snippet),
+        _compose_cmd("exec", "-T", "weblate", _PYTHON, "-c", code),
+        timeout=timeout,
         capture_output=True,
         text=True,
         check=False,
@@ -45,9 +57,9 @@ def docker_exec_python(snippet: str) -> str:
     return result.stdout.strip()
 
 
-def docker_exec_python_json(snippet: str) -> Any:
+def docker_exec_python_json(snippet: str, *, timeout: float = 120.0) -> Any:
     """Run a Python snippet and parse stdout as JSON."""
-    return json.loads(docker_exec_python(snippet))
+    return json.loads(docker_exec_python(snippet, timeout=timeout))
 
 
 def docker_exec_read_file(path: str) -> str:

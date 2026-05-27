@@ -22,8 +22,10 @@ def _api_error_message(method: str, path: str, code: int, raw: bytes) -> str:
     return f"GitHub API {method} {path} failed: {code} {body}"
 
 
-class TestRepoManager:
+class EphemeralGitHubRepo:
     """Create, populate, and destroy a temporary GitHub repo for integration tests."""
+
+    __test__ = False  # not a pytest test class
 
     def __init__(self, token: str, repo_name: str) -> None:
         self.token = token

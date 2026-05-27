@@ -67,7 +67,11 @@ class WeblateAPI:
             "POST",
             "/api/projects/",
             token=self.token,
-            body={"name": name, "slug": slug},
+            body={
+                "name": name,
+                "slug": slug,
+                "web": f"{self._base}/",
+            },
         )
         assert code == 200, f"create_project failed: {code} {body}"
         assert isinstance(body, dict)
@@ -225,12 +229,7 @@ class WeblateAPI:
         deadline = time.monotonic() + timeout
         snippet_template = """
 import json
-import os
 import time
-
-os.environ.setdefault("DJANGO_SETTINGS_MODULE", "weblate.settings_docker")
-import django
-django.setup()
 
 from celery.result import AsyncResult
 from weblate.utils.celery import app
@@ -260,7 +259,7 @@ print(json.dumps({{"ok": True, "result": result}}))
                 interval=interval,
             )
             try:
-                out = docker_exec_python(snippet)
+                out = docker_exec_python(snippet, timeout=timeout)
                 data = json.loads(out)
                 return data.get("result")
             except (RuntimeError, json.JSONDecodeError, TimeoutError) as exc:

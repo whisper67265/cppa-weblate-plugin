@@ -20,7 +20,7 @@ from tests.integration.conftest import (
     TEST_LANG_CODE,
     TEST_VERSION,
 )
-from tests.integration.lib.gh_repo import TestRepoManager
+from tests.integration.lib.gh_repo import EphemeralGitHubRepo
 from tests.integration.lib.http import http_json
 from tests.integration.lib.weblate_api import WeblateAPI
 
@@ -115,7 +115,7 @@ class TestBoostComponentServiceE2E:
 
     @staticmethod
     def _service_snippet(
-        test_repo: TestRepoManager,
+        test_repo: EphemeralGitHubRepo,
         *,
         run_process_all: bool = False,
         run_twice: bool = False,
@@ -185,7 +185,7 @@ if {run_process_all!r}:
 print(json.dumps(out))
 """
 
-    def test_clone_and_scan(self, exec_python, test_repo: TestRepoManager) -> None:
+    def test_clone_and_scan(self, exec_python, test_repo: EphemeralGitHubRepo) -> None:
         out = json.loads(
             exec_python(self._service_snippet(test_repo, run_process_all=False))
         )
@@ -195,7 +195,7 @@ print(json.dumps(out))
         assert any(c["format"] == "asciidoc" for c in out["configs"])
 
     def test_project_component_creation(
-        self, exec_python, test_repo: TestRepoManager
+        self, exec_python, test_repo: EphemeralGitHubRepo
     ) -> None:
         """Direct process_all on a DB with no prior components for this repo."""
         out = json.loads(
@@ -220,7 +220,7 @@ print("ok")
         )
         assert check == "ok"
 
-    def test_idempotency(self, exec_python, test_repo: TestRepoManager) -> None:
+    def test_idempotency(self, exec_python, test_repo: EphemeralGitHubRepo) -> None:
         out = json.loads(
             exec_python(
                 self._service_snippet(test_repo, run_process_all=True, run_twice=True)
@@ -239,7 +239,7 @@ class TestAddOrUpdateCeleryFlow:
     """POST /boost-endpoint/add-or-update/ and poll Celery completion."""
 
     def test_add_or_update_returns_202(
-        self, api_token: str, test_repo: TestRepoManager
+        self, api_token: str, test_repo: EphemeralGitHubRepo
     ) -> None:
         owner = test_repo.resolve_owner()
         body = {
@@ -260,7 +260,7 @@ class TestAddOrUpdateCeleryFlow:
         type(self).task_id = str(data["task_id"])
 
     def test_add_or_update_task_completes(
-        self, weblate_api: WeblateAPI, test_repo: TestRepoManager
+        self, weblate_api: WeblateAPI, test_repo: EphemeralGitHubRepo
     ) -> None:
         task_id = getattr(self, "task_id", None)
         if not task_id:

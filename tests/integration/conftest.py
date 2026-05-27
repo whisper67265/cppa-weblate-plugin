@@ -13,7 +13,7 @@ from pathlib import Path
 import pytest
 
 from tests.integration.lib.docker_exec import docker_exec_python, docker_exec_read_file
-from tests.integration.lib.gh_repo import TestRepoManager, default_repo_name
+from tests.integration.lib.gh_repo import EphemeralGitHubRepo, default_repo_name
 from tests.integration.lib.http import base_url
 from tests.integration.lib.weblate_api import WeblateAPI
 
@@ -55,14 +55,14 @@ def weblate_ssh_pubkey() -> str:
 
 
 @pytest.fixture(scope="session")
-def test_repo(weblate_ssh_pubkey: str) -> TestRepoManager:
+def test_repo(weblate_ssh_pubkey: str) -> EphemeralGitHubRepo:
     """Ephemeral GitHub repo with fixture docs and Weblate deploy key."""
     token = os.environ.get("GH_TEST_REPO_TOKEN", "").strip()
     if not token:
         pytest.skip("GH_TEST_REPO_TOKEN is not set")
 
     repo_name = default_repo_name()
-    manager = TestRepoManager(token, repo_name)
+    manager = EphemeralGitHubRepo(token, repo_name)
     try:
         manager.create_repo()
         manager.push_fixtures(FIXTURES_DIR, branch=TEST_BRANCH)
