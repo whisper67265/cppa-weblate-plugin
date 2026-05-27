@@ -15,6 +15,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 25
     env:
+      # Use a repository *secret* (Settings → Secrets → Actions), not a variable.
       GH_TEST_REPO_TOKEN: ${{ secrets.GH_TEST_REPO_TOKEN }}
     steps:
     # actions/checkout v6.0.2
@@ -26,6 +27,22 @@ jobs:
     - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
       with:
         python-version: '3.12'
+
+    - name: Check GitHub test token availability
+      run: |
+        set -euo pipefail
+        if [ "${{ github.event_name }}" = "pull_request" ] && \
+           [ "${{ github.event.pull_request.head.repo.full_name }}" != "${{ github.repository }}" ]; then
+          echo "::notice::Fork PR: repository secrets (including GH_TEST_REPO_TOKEN)" \
+               "are not passed to workflows from forks."
+        fi
+        if [ -n "${GH_TEST_REPO_TOKEN:-}" ]; then
+          echo "GH_TEST_REPO_TOKEN is set (${#GH_TEST_REPO_TOKEN} characters)."
+        else
+          echo "::warning::GH_TEST_REPO_TOKEN is empty. E2E/Celery functional tests will be skipped."
+          echo "Add a classic PAT with the 'repo' scope as repository secret GH_TEST_REPO_TOKEN."
+          echo "Re-run the workflow after saving the secret (secrets are not applied retroactively to old runs)."
+        fi
 
     - name: Run integration functional tests
       run: bash scripts/integration-functional.sh

@@ -42,6 +42,13 @@ export WEBLATE_COMPOSE_PROJECT="${COMPOSE_PROJECT_NAME}"
 echo "=== Extracting Weblate SSH public key ==="
 export WEBLATE_SSH_PUBKEY="$(compose exec -T weblate cat /app/data/ssh/id_rsa.pub)"
 
+if [[ -n "${GH_TEST_REPO_TOKEN:-}" ]]; then
+    export GH_TEST_REPO_TOKEN
+    echo "=== GH_TEST_REPO_TOKEN is set (${#GH_TEST_REPO_TOKEN} chars); GitHub E2E tests enabled ==="
+else
+    echo "=== GH_TEST_REPO_TOKEN is not set; GitHub E2E/Celery tests will be skipped ==="
+fi
+
 echo "=== Running functional tests ==="
 pip install --quiet pytest pytest-timeout
 python -m pytest --confcutdir=tests/integration --override-ini addopts= \

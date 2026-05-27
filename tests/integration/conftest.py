@@ -59,7 +59,11 @@ def test_repo(weblate_ssh_pubkey: str) -> EphemeralGitHubRepo:
     """Ephemeral GitHub repo with fixture docs and Weblate deploy key."""
     token = os.environ.get("GH_TEST_REPO_TOKEN", "").strip()
     if not token:
-        pytest.skip("GH_TEST_REPO_TOKEN is not set")
+        pytest.skip(
+            "GH_TEST_REPO_TOKEN is not set in the job environment "
+            "(repository Actions secret with classic PAT 'repo' scope; "
+            "not available on pull_request workflows from forks)"
+        )
 
     repo_name = default_repo_name()
     manager = EphemeralGitHubRepo(token, repo_name)
