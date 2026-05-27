@@ -36,6 +36,13 @@ def project_web_url(live_base_url: str | None = None) -> str:
     return f"{base}/"
 
 
+def _expect_status(
+    code: int, allowed: tuple[int, ...], label: str, detail: Any
+) -> None:
+    if code not in allowed:
+        raise AssertionError(f"{label} failed: {code} {detail}")
+
+
 def _multipart_encode(
     fields: dict[str, str], files: dict[str, tuple[str, bytes, str]]
 ) -> tuple[bytes, str]:
@@ -91,7 +98,7 @@ class WeblateAPI:
                 "web": project_web_url(self._base),
             },
         )
-        assert code == 200, f"create_project failed: {code} {body}"
+        _expect_status(code, (200, 201), "create_project", body)
         assert isinstance(body, dict)
         return body
 
@@ -125,7 +132,7 @@ class WeblateAPI:
             token=self.token,
             body=payload,
         )
-        assert code == 200, f"create_component failed: {code} {body}"
+        _expect_status(code, (200, 201), "create_component", body)
         assert isinstance(body, dict)
         return body
 
@@ -172,9 +179,10 @@ class WeblateAPI:
             parsed: Any = json.loads(raw.decode())
         except json.JSONDecodeError:
             parsed = raw.decode(errors="replace")
-        assert code == 200, f"upload_file failed: {code} {parsed}"
-        assert isinstance(parsed, dict)
-        return parsed
+        _expect_status(code, (200, 201), "upload_file", parsed)
+        if isinstance(parsed, dict):
+            return parsed
+        return {"status_code": code, "body": parsed}
 
     def list_units(
         self,

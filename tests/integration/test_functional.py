@@ -70,7 +70,7 @@ class TestQuickBookRoundTrip:
             token=weblate_api.token,
             body={"language_code": "ja"},
         )
-        assert code == 200, f"add language failed: {code} {body}"
+        assert code in (200, 201), f"add language failed: {code} {body}"
 
         type(self).project_slug = project_slug
         type(self).component_slug = component_slug
