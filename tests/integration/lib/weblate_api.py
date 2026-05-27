@@ -43,6 +43,55 @@ def _expect_status(
         raise AssertionError(f"{label} failed: {code} {detail}")
 
 
+def component_defaults_payload(
+    *,
+    name: str,
+    slug: str,
+    file_format: str,
+    filemask: str,
+    template: str = "",
+    new_base: str | None = None,
+    repo: str = "local:",
+    vcs: str = "local",
+    source_language_code: str = "en",
+    language_regex: str = "",
+) -> dict[str, Any]:
+    """Component fields aligned with ``BoostComponentService`` (services.py)."""
+    return {
+        "name": name,
+        "slug": slug,
+        "repo": repo,
+        "vcs": vcs,
+        "file_format": file_format,
+        "filemask": filemask,
+        "template": template,
+        "new_base": new_base or template,
+        "source_language": {"code": source_language_code},
+        "edit_template": False,
+        "manage_units": False,
+        "license": "",
+        "allow_translation_propagation": False,
+        "enable_suggestions": True,
+        "suggestion_voting": False,
+        "suggestion_autoaccept": 0,
+        "check_flags": "",
+        "language_regex": language_regex,
+    }
+
+
+def _payload_to_multipart_fields(payload: dict[str, Any]) -> dict[str, str]:
+    """Convert JSON API payload values to multipart form strings."""
+    fields: dict[str, str] = {}
+    for key, value in payload.items():
+        if key == "source_language" and isinstance(value, dict):
+            fields["source_language"] = str(value.get("code", "en"))
+        elif isinstance(value, bool):
+            fields[key] = "true" if value else "false"
+        else:
+            fields[key] = str(value)
+    return fields
+
+
 def _multipart_encode(
     fields: dict[str, str], files: dict[str, tuple[str, bytes, str]]
 ) -> tuple[bytes, str]:
@@ -114,20 +163,19 @@ class WeblateAPI:
         new_base: str | None = None,
         repo: str = "local:",
         vcs: str = "local",
+        language_regex: str = "",
     ) -> dict[str, Any]:
-        payload: dict[str, Any] = {
-            "name": name,
-            "slug": slug,
-            "repo": repo,
-            "vcs": vcs,
-            "file_format": file_format,
-            "filemask": filemask,
-            "template": template,
-            "new_base": new_base or template,
-            "source_language": {"code": "en"},
-            "edit_template": False,
-            "manage_units": False,
-        }
+        payload = component_defaults_payload(
+            name=name,
+            slug=slug,
+            file_format=file_format,
+            filemask=filemask,
+            template=template,
+            new_base=new_base,
+            repo=repo,
+            vcs=vcs,
+            language_regex=language_regex,
+        )
         code, body = http_json(
             "POST",
             f"/api/projects/{project_slug}/components/",
@@ -135,6 +183,76 @@ class WeblateAPI:
             body=payload,
         )
         _expect_status(code, (200, 201), "create_component", body)
+        assert isinstance(body, dict)
+        return body
+
+    def _post_multipart(
+        self,
+        path: str,
+        fields: dict[str, str],
+        files: dict[str, tuple[str, bytes, str]],
+        *,
+        label: str,
+        timeout: float = 120.0,
+    ) -> tuple[int, Any]:
+        body_bytes, content_type = _multipart_encode(fields, files)
+        req = Request(
+            self._url(path),
+            data=body_bytes,
+            headers={
+                "Authorization": f"Bearer {self.token}",
+                "Content-Type": content_type,
+            },
+            method="POST",
+        )
+        try:
+            with urlopen(req, timeout=timeout) as resp:
+                raw = resp.read()
+                code = resp.getcode()
+        except HTTPError as e:
+            raw = e.read()
+            code = e.code
+
+        if not raw:
+            return code, {"status_code": code}
+        try:
+            parsed: Any = json.loads(raw.decode())
+        except json.JSONDecodeError:
+            parsed = raw.decode(errors="replace")
+        _expect_status(code, (200, 201), label, parsed)
+        return code, parsed
+
+    def create_component_from_docfile(
+        self,
+        project_slug: str,
+        *,
+        name: str,
+        slug: str,
+        file_format: str,
+        docfile_path: Path,
+        filemask: str = "*.qbk",
+        language_regex: str = "",
+    ) -> dict[str, Any]:
+        """Create a component by uploading a document (Weblate multipart API)."""
+        content = docfile_path.read_bytes()
+        mime, _ = mimetypes.guess_type(str(docfile_path))
+        mime = mime or "application/octet-stream"
+        payload = component_defaults_payload(
+            name=name,
+            slug=slug,
+            file_format=file_format,
+            filemask=filemask,
+            template="",
+            new_base="",
+            language_regex=language_regex,
+        )
+        fields = _payload_to_multipart_fields(payload)
+        _code, body = self._post_multipart(
+            f"/api/projects/{project_slug}/components/",
+            fields,
+            {"docfile": (docfile_path.name, content, mime)},
+            label="create_component_from_docfile",
+        )
         assert isinstance(body, dict)
         return body
 

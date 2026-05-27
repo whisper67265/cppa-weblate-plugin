@@ -28,7 +28,7 @@ pytestmark = pytest.mark.integration
 
 QBK_FIXTURE = FIXTURES_DIR / "quickbook_fixture.qbk"
 KNOWN_SOURCE_STRING = "Complex QuickBook test fixture"
-JA_TRANSLATION = "複雑な QuickBook テストフィクスチャ"
+ZH_HANS_TRANSLATION = "复杂 QuickBook 测试夹具"
 
 
 # ---------------------------------------------------------------------------
@@ -47,28 +47,22 @@ class TestQuickBookRoundTrip:
         project_slug = WeblateAPI.unique_slug("func-qbk")
         component_slug = "qbk-fixture"
         weblate_api.create_project("Functional QBK", project_slug)
-        weblate_api.create_component(
+        # Docfile multipart upload (no empty local VCS template paths).
+        weblate_api.create_component_from_docfile(
             project_slug,
             name="QBK Fixture",
             slug=component_slug,
             file_format="quickbook",
+            docfile_path=QBK_FIXTURE,
             filemask="doc/*.qbk",
-            template="doc/quickbook_fixture.qbk",
-            new_base="doc/quickbook_fixture.qbk",
-        )
-        weblate_api.upload_file(
-            project_slug,
-            component_slug,
-            "en",
-            QBK_FIXTURE,
-            method="source",
+            language_regex=f"^{TEST_LANG_CODE}$",
         )
         # Add target language for translation workflow
         code, body = http_json(
             "POST",
             f"/api/projects/{project_slug}/components/{component_slug}/translations/",
             token=weblate_api.token,
-            body={"language_code": "zh_Hans"},
+            body={"language_code": TEST_LANG_CODE},
         )
         assert code in (200, 201), f"add language failed: {code} {body}"
 
@@ -78,7 +72,7 @@ class TestQuickBookRoundTrip:
     def test_units_extracted(self, weblate_api: WeblateAPI) -> None:
         assert self.project_slug and self.component_slug
         units = weblate_api.list_units(
-            self.project_slug, self.component_slug, "zh_Hans"
+            self.project_slug, self.component_slug, TEST_LANG_CODE
         )
         assert len(units) > 0
         sources = [
@@ -90,7 +84,7 @@ class TestQuickBookRoundTrip:
     def test_submit_translation(self, weblate_api: WeblateAPI) -> None:
         assert self.project_slug and self.component_slug
         units = weblate_api.list_units(
-            self.project_slug, self.component_slug, "zh_Hans"
+            self.project_slug, self.component_slug, TEST_LANG_CODE
         )
         match = next(
             (u for u in units if KNOWN_SOURCE_STRING in str(u.get("source", ""))),
@@ -99,15 +93,15 @@ class TestQuickBookRoundTrip:
         assert match is not None
         unit_url = match["unit"]
         type(self).unit_url = unit_url
-        weblate_api.submit_translation(unit_url, JA_TRANSLATION)
+        weblate_api.submit_translation(unit_url, ZH_HANS_TRANSLATION)
 
     def test_download_translated_qbk(self, weblate_api: WeblateAPI) -> None:
         assert self.project_slug and self.component_slug
         raw = weblate_api.download_file(
-            self.project_slug, self.component_slug, "zh_Hans"
+            self.project_slug, self.component_slug, TEST_LANG_CODE
         )
         text = raw.decode("utf-8", errors="replace")
-        assert JA_TRANSLATION in text or KNOWN_SOURCE_STRING in text
+        assert ZH_HANS_TRANSLATION in text or KNOWN_SOURCE_STRING in text
 
 
 # ---------------------------------------------------------------------------
