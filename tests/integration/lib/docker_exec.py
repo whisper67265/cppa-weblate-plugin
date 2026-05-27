@@ -20,8 +20,19 @@ def _compose_cmd() -> list[str]:
     return ["docker", "compose", "-f", compose_file, "-p", project]
 
 
+def _weblate_django_preamble() -> str:
+    """Weblate format modules need a configured Django app registry."""
+    return (
+        "import os; "
+        'os.environ.setdefault("DJANGO_SETTINGS_MODULE", "weblate.settings_docker"); '
+        "import django; "
+        "django.setup(); "
+    )
+
+
 def docker_exec_python(snippet: str, *, timeout: float = 30.0) -> str:
     """Run a Python snippet inside the weblate container and return stdout."""
+    code = _weblate_django_preamble() + snippet
     cmd = [
         *_compose_cmd(),
         "exec",
@@ -29,7 +40,7 @@ def docker_exec_python(snippet: str, *, timeout: float = 30.0) -> str:
         "weblate",
         "/app/venv/bin/python",
         "-c",
-        snippet,
+        code,
     ]
     result = subprocess.run(
         cmd,

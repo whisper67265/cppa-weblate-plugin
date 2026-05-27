@@ -44,10 +44,13 @@ stack_wait_healthy() {
 
 stack_create_token() {
     local user="${1:-admin}"
-    # Weblate 2026+ removed `weblate createtoken`; issue a DRF token with Weblate's key shape (wlu_/wlp_).
+    # Use python -c (not `weblate shell`) so stdout is only the key
     compose exec -T -e "WEBLATE_CI_USERNAME=${user}" weblate \
-        weblate shell -c \
+        /app/venv/bin/python -c \
         'import os
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "weblate.settings_docker")
+import django
+django.setup()
 from weblate.auth.models import User
 from rest_framework.authtoken.models import Token
 from weblate.utils.token import get_token
