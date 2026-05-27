@@ -17,6 +17,11 @@ def base_url() -> str:
     return os.environ.get("WEBLATE_LIVE_BASE_URL", "http://localhost:8080").rstrip("/")
 
 
+def auth_header(token: str) -> str:
+    """Weblate API token auth (see Weblate 5.16 REST API docs)."""
+    return f"Token {token}"
+
+
 def http_json(
     method: str,
     path: str,
@@ -29,7 +34,7 @@ def http_json(
     url = f"{base_url()}{path}"
     headers: dict[str, str] = {"Accept": "application/json"}
     if token is not None:
-        headers["Authorization"] = f"Bearer {token}"
+        headers["Authorization"] = auth_header(token)
 
     data: bytes | None = None
     if body is not None:

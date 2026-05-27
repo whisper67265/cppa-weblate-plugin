@@ -17,7 +17,7 @@ from urllib.error import HTTPError
 from urllib.parse import urlparse
 from urllib.request import Request, urlopen
 
-from tests.integration.lib.http import base_url, http_json
+from tests.integration.lib.http import auth_header, base_url, http_json
 
 # Weblate blocks localhost/loopback in project.web (SSRF protection).
 _DEFAULT_PROJECT_WEB = "https://example.com/"
@@ -41,6 +41,14 @@ def _expect_status(
 ) -> None:
     if code not in allowed:
         raise AssertionError(f"{label} failed: {code} {detail}")
+
+
+def _unwrap_api_result(body: dict[str, Any]) -> dict[str, Any]:
+    """Unwrap ``{"result": ...}`` envelopes from Weblate write endpoints."""
+    result = body.get("result")
+    if isinstance(result, dict):
+        return result
+    return body
 
 
 def component_defaults_payload(
@@ -135,6 +143,13 @@ class WeblateAPI:
             path = f"/{path}"
         return f"{self._base}{path}"
 
+    def _api_path(self, url_or_path: str) -> str:
+        if url_or_path.startswith("http"):
+            return url_or_path.replace(self._base, "", 1)
+        if not url_or_path.startswith("/"):
+            return f"/{url_or_path}"
+        return url_or_path
+
     def create_project(self, name: str, slug: str | None = None) -> dict[str, Any]:
         slug = slug or name.lower().replace(" ", "-")
         code, body = http_json(
@@ -184,7 +199,11 @@ class WeblateAPI:
         )
         _expect_status(code, (200, 201), "create_component", body)
         assert isinstance(body, dict)
-        return body
+        component = _unwrap_api_result(body)
+        task_url = component.get("task_url")
+        if isinstance(task_url, str) and task_url:
+            self.wait_for_background_task(task_url)
+        return component
 
     def _post_multipart(
         self,
@@ -200,7 +219,7 @@ class WeblateAPI:
             self._url(path),
             data=body_bytes,
             headers={
-                "Authorization": f"Bearer {self.token}",
+                "Authorization": auth_header(self.token),
                 "Content-Type": content_type,
             },
             method="POST",
@@ -247,6 +266,7 @@ class WeblateAPI:
             language_regex=language_regex,
         )
         fields = _payload_to_multipart_fields(payload)
+        fields["new_lang"] = "add"
         _code, body = self._post_multipart(
             f"/api/projects/{project_slug}/components/",
             fields,
@@ -254,9 +274,35 @@ class WeblateAPI:
             label="create_component_from_docfile",
         )
         assert isinstance(body, dict)
-        resolved_slug = str(body.get("slug", slug))
+        component = _unwrap_api_result(body)
+        resolved_slug = str(component.get("slug", slug))
+        task_url = component.get("task_url")
+        if isinstance(task_url, str) and task_url:
+            self.wait_for_background_task(task_url)
         self.wait_for_component(project_slug, resolved_slug)
-        return body
+        return component
+
+    def wait_for_background_task(
+        self,
+        task_url: str,
+        *,
+        timeout: float = 120.0,
+        interval: float = 2.0,
+    ) -> dict[str, Any]:
+        """Poll ``GET /api/tasks/(uuid)/`` until component creation finishes."""
+        path = self._api_path(task_url)
+        deadline = time.monotonic() + timeout
+        last: tuple[int, Any] = (0, None)
+        while time.monotonic() < deadline:
+            code, body = http_json("GET", path, token=self.token)
+            last = (code, body)
+            if code == 200 and isinstance(body, dict) and body.get("completed"):
+                return body
+            time.sleep(interval)
+        raise TimeoutError(
+            f"Background task {task_url} not completed after {timeout}s: "
+            f"{last[0]} {last[1]}"
+        )
 
     def wait_for_component(
         self,
@@ -317,7 +363,9 @@ class WeblateAPI:
             body={"language_code": language_code},
         )
         if code in (200, 201) and isinstance(body, dict):
-            result = body.get("result", body)
+            if body.get("language_code"):
+                return body
+            result = body.get("result")
             if isinstance(result, dict):
                 return result
             return body
@@ -351,7 +399,7 @@ class WeblateAPI:
             url,
             data=body_bytes,
             headers={
-                "Authorization": f"Bearer {self.token}",
+                "Authorization": auth_header(self.token),
                 "Content-Type": content_type,
             },
             method="POST",
@@ -380,32 +428,56 @@ class WeblateAPI:
         project_slug: str,
         component_slug: str,
         language_code: str,
+        *,
+        min_count: int = 1,
+        timeout: float = 120.0,
+        interval: float = 2.0,
     ) -> list[dict[str, Any]]:
-        code, body = http_json(
-            "GET",
-            (
-                f"/api/translations/{project_slug}/{component_slug}/"
-                f"{language_code}/units/?q=state:>=empty"
-            ),
-            token=self.token,
+        """List translation units, polling until strings are extracted."""
+        path = (
+            f"/api/translations/{project_slug}/{component_slug}/"
+            f"{language_code}/units/?page_size=100"
         )
-        assert code == 200, f"list_units failed: {code} {body}"
-        assert isinstance(body, dict)
-        results = body.get("results", body)
-        assert isinstance(results, list)
-        return results
+        deadline = time.monotonic() + timeout
+        last: tuple[int, Any] = (0, None)
+        while time.monotonic() < deadline:
+            code, body = http_json("GET", path, token=self.token)
+            last = (code, body)
+            if code != 200:
+                break
+            assert isinstance(body, dict)
+            results = body.get("results")
+            if isinstance(results, list) and len(results) >= min_count:
+                return results
+            time.sleep(interval)
+        raise AssertionError(f"list_units failed: {last[0]} {last[1]}")
+
+    @staticmethod
+    def unit_api_url(unit: dict[str, Any]) -> str:
+        """Return the REST path for PATCHing a unit from a list-units result item."""
+        url = unit.get("url")
+        if isinstance(url, str) and url:
+            return url
+        nested = unit.get("unit")
+        if isinstance(nested, str) and nested:
+            return nested
+        if isinstance(nested, dict):
+            nested_url = nested.get("url")
+            if isinstance(nested_url, str) and nested_url:
+                return nested_url
+        unit_id = unit.get("id")
+        if unit_id is not None:
+            return f"/api/units/{unit_id}/"
+        raise KeyError(f"unit has no API URL: {unit!r}")
 
     def submit_translation(self, unit_url: str, target: str) -> dict[str, Any]:
-        """PATCH a unit with translated target text."""
-        if unit_url.startswith("http"):
-            path = unit_url.replace(self._base, "", 1)
-        else:
-            path = unit_url
+        """PATCH a unit with translated target text (state 20 = translated)."""
+        path = self._api_path(unit_url)
         code, body = http_json(
             "PATCH",
             path,
             token=self.token,
-            body={"target": [target]},
+            body={"target": [target], "state": 20},
         )
         assert code == 200, f"submit_translation failed: {code} {body}"
         assert isinstance(body, dict)
@@ -422,7 +494,7 @@ class WeblateAPI:
         )
         req = Request(
             url,
-            headers={"Authorization": f"Bearer {self.token}"},
+            headers={"Authorization": auth_header(self.token)},
             method="GET",
         )
         try:

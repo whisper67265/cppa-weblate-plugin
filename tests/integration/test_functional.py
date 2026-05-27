@@ -85,7 +85,7 @@ class TestQuickBookRoundTrip:
             None,
         )
         assert match is not None
-        unit_url = match["unit"]
+        unit_url = WeblateAPI.unit_api_url(match)
         type(self).unit_url = unit_url
         weblate_api.submit_translation(unit_url, ZH_HANS_TRANSLATION)
 
