@@ -1,0 +1,60 @@
+# SPDX-FileCopyrightText: 2026 Andrew Zhang <whisper67265@outlook.com>
+#
+# SPDX-License-Identifier: BSL-1.0
+
+# Shared Docker Compose stack for integration tests and CD deployments.
+# CI: docker compose -f docker/docker-compose.yml build && up
+# CD: same file, overridden via .env on the deploy server.
+
+services:
+  postgresql:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: weblate
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-weblate}
+      POSTGRES_DB: weblate
+    healthcheck:
+      test: [CMD, pg_isready, -U, weblate]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    tmpfs:
+    - /var/lib/postgresql/data
+
+  redis:
+    image: redis:7-alpine
+    healthcheck:
+      test: [CMD, redis-cli, ping]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  weblate:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.weblate-plugin
+    ports:
+    - ${WEBLATE_PORT:-8080}:8080
+    depends_on:
+      postgresql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      WEBLATE_SITE_DOMAIN: ${WEBLATE_SITE_DOMAIN:-localhost:8080}
+      WEBLATE_ADMIN_PASSWORD: ${WEBLATE_ADMIN_PASSWORD:-admin}
+      WEBLATE_DEBUG: ${WEBLATE_DEBUG:-1}
+      POSTGRES_HOST: postgresql
+      POSTGRES_PORT: '5432'
+      POSTGRES_USER: weblate
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-weblate}
+      POSTGRES_DATABASE: weblate
+      REDIS_HOST: redis
+      REDIS_PORT: '6379'
+      CELERY_SINGLE_PROCESS: '1'
+    healthcheck:
+      test: [CMD, curl, -f, http://localhost:8080/healthz/]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 60s

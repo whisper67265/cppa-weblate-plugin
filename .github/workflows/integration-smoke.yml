@@ -1,0 +1,32 @@
+# SPDX-FileCopyrightText: 2026 Andrew Zhang <whisper67265@outlook.com>
+#
+# SPDX-License-Identifier: BSL-1.0
+
+name: Integration smoke
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  integration-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+    - uses: actions/checkout@v4
+
+    - uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+
+    - name: Run integration smoke tests
+      run: bash scripts/integration-smoke.sh
+
+    - name: Upload logs on failure
+      if: failure()
+      uses: actions/upload-artifact@v4
+      with:
+        name: integration-smoke-logs
+        path: /tmp/compose-logs.txt

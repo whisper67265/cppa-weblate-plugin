@@ -125,6 +125,10 @@ level = "cautious"
 unauthorized_licenses = []
 
 [tool.pytest.ini_options]
+addopts = ["-m", "not integration"]
+markers = [
+  "integration: requires live Weblate stack (Docker Compose) and optional WEBLATE_API_TOKEN"
+]
 python_classes = ["Test*"]
 python_files = ["test_*.py", "*_test.py"]
 pythonpath = ["src", "."]

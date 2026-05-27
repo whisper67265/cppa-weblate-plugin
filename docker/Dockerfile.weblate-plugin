@@ -1,0 +1,28 @@
+# SPDX-FileCopyrightText: 2026 Andrew Zhang <whisper67265@outlook.com>
+#
+# SPDX-License-Identifier: BSL-1.0
+
+# Overlay image: stock Weblate + cppa-weblate-plugin installed into /app/venv.
+# CI builds with repo root as context (installs checked-out branch).
+# CD builds on the deploy server where the target branch is already checked out.
+
+FROM weblate/weblate:latest
+
+ARG PLUGIN_GIT_URL=https://github.com/cppalliance/cppa-weblate-plugin.git
+ARG PLUGIN_GIT_REF=
+
+RUN /app/venv/bin/pip install --no-cache-dir uv
+
+COPY src/boost_weblate/settings_override.py /app/data/settings-override.py
+
+COPY . /tmp/plugin-src/
+RUN set -eux; \
+    if [ ! -f /tmp/plugin-src/pyproject.toml ]; then \
+      if [ -z "${PLUGIN_GIT_REF}" ]; then \
+        echo "ERROR: No pyproject.toml in build context and PLUGIN_GIT_REF is unset"; exit 1; \
+      fi; \
+      rm -rf /tmp/plugin-src; \
+      git clone --depth 1 --branch "${PLUGIN_GIT_REF}" "${PLUGIN_GIT_URL}" /tmp/plugin-src; \
+    fi; \
+    /app/venv/bin/uv pip install --python /app/venv/bin/python /tmp/plugin-src; \
+    rm -rf /tmp/plugin-src
