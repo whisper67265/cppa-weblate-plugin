@@ -125,6 +125,8 @@ class WeblateAPI:
             "template": template,
             "new_base": new_base or template,
             "source_language": {"code": "en"},
+            # QuickBook and similar convert formats reject manage_units=True.
+            "manage_units": False,
         }
         code, body = http_json(
             "POST",
