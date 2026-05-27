@@ -68,7 +68,7 @@ class TestQuickBookRoundTrip:
             "POST",
             f"/api/projects/{project_slug}/components/{component_slug}/translations/",
             token=weblate_api.token,
-            body={"language_code": "ja"},
+            body={"language_code": "zh_Hans"},
         )
         assert code in (200, 201), f"add language failed: {code} {body}"
 
@@ -77,7 +77,9 @@ class TestQuickBookRoundTrip:
 
     def test_units_extracted(self, weblate_api: WeblateAPI) -> None:
         assert self.project_slug and self.component_slug
-        units = weblate_api.list_units(self.project_slug, self.component_slug, "ja")
+        units = weblate_api.list_units(
+            self.project_slug, self.component_slug, "zh_Hans"
+        )
         assert len(units) > 0
         sources = [
             u.get("source", [""])[0] if isinstance(u.get("source"), list) else ""
@@ -87,7 +89,9 @@ class TestQuickBookRoundTrip:
 
     def test_submit_translation(self, weblate_api: WeblateAPI) -> None:
         assert self.project_slug and self.component_slug
-        units = weblate_api.list_units(self.project_slug, self.component_slug, "ja")
+        units = weblate_api.list_units(
+            self.project_slug, self.component_slug, "zh_Hans"
+        )
         match = next(
             (u for u in units if KNOWN_SOURCE_STRING in str(u.get("source", ""))),
             None,
@@ -99,7 +103,9 @@ class TestQuickBookRoundTrip:
 
     def test_download_translated_qbk(self, weblate_api: WeblateAPI) -> None:
         assert self.project_slug and self.component_slug
-        raw = weblate_api.download_file(self.project_slug, self.component_slug, "ja")
+        raw = weblate_api.download_file(
+            self.project_slug, self.component_slug, "zh_Hans"
+        )
         text = raw.decode("utf-8", errors="replace")
         assert JA_TRANSLATION in text or KNOWN_SOURCE_STRING in text
 

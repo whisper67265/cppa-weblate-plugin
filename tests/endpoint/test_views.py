@@ -71,7 +71,7 @@ def test_add_or_update_requires_authentication(
         {
             "organization": "o",
             "version": "v",
-            "add_or_update": {"ja": ["json"]},
+            "add_or_update": {"zh_Hans": ["json"]},
         },
         format="json",
     )
@@ -98,7 +98,7 @@ def test_add_or_update_accepts_and_enqueues_like_boost_weblate(
         {
             "organization": "o",
             "version": "v",
-            "add_or_update": {"ja": ["json"]},
+            "add_or_update": {"zh_Hans": ["json"]},
         },
         format="json",
     )
@@ -122,7 +122,7 @@ def test_add_or_update_accepts_and_enqueues_like_boost_weblate(
 
     delay_mock.assert_called_once_with(
         organization="o",
-        add_or_update={"ja": ["json"]},
+        add_or_update={"zh_Hans": ["json"]},
         version="v",
         extensions=None,
         user_id=42,
@@ -168,16 +168,16 @@ def test_boost_add_or_update_task_matches_boost_weblate_loop(
 
     result = tasks_mod.boost_add_or_update_task.run(
         organization="org",
-        add_or_update={"ja": ["json"], "zh": ["a"]},
+        add_or_update={"zh_Hans": ["a"], "ja": ["json"]},
         version="boost-1.0",
         extensions=[".md"],
         user_id=7,
     )
 
     get_mock.assert_called_once_with(pk=7)
-    assert calls == [("ja", ["json"]), ("zh", ["a"])]
+    assert calls == [("zh_Hans", ["a"]), ("ja", ["json"])]
+    assert result["zh_Hans"]["organization"] == "org"
     assert result["ja"]["submodules"] == ["json"]
-    assert result["zh"]["organization"] == "org"
 
 
 def test_boost_add_or_update_task_propagates_service_errors(

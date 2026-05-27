@@ -27,7 +27,7 @@ def test_add_or_update_serializer_accepts_extensions() -> None:
         data={
             "organization": "o",
             "version": "v",
-            "add_or_update": {"ja": ["unordered"]},
+            "add_or_update": {"zh_Hans": ["unordered"]},
             "extensions": [".adoc", ".md"],
         }
     )
@@ -64,11 +64,11 @@ def test_add_or_update_serializer_rejects_non_list_submodules() -> None:
         data={
             "organization": "o",
             "version": "v",
-            "add_or_update": {"ja": "json"},
+            "add_or_update": {"zh_Hans": "json"},
         }
     )
     assert not ser.is_valid()
-    assert "ja" in ser.errors["add_or_update"]
+    assert "zh_Hans" in ser.errors["add_or_update"]
 
 
 def test_add_or_update_serializer_missing_required_fields() -> None:
