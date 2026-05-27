@@ -14,6 +14,7 @@ source "${SCRIPT_DIR}/lib/weblate-stack.sh"
 
 cleanup() {
     local exit_code=$?
+    set +e
     echo "--- Collecting logs ---"
     stack_logs /tmp/compose-logs.txt
     echo "--- Tearing down stack ---"
