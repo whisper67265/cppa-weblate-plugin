@@ -85,7 +85,7 @@ class EphemeralGitHubRepo:
         return self.owner
 
     def create_repo(self) -> str:
-        """Create a private repo; return SSH clone URL."""
+        """Create a repo; return SSH clone URL."""
         owner = self.resolve_owner()
         self._request(
             "POST",

@@ -56,6 +56,6 @@ else
 fi
 
 echo "=== Running functional tests ==="
-pip install --quiet pytest pytest-timeout
+uv pip install --quiet --group integration
 python -m pytest --confcutdir=tests/integration --override-ini addopts= \
     tests/integration/test_functional.py -v --timeout=300
