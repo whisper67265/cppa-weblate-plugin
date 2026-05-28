@@ -7,13 +7,17 @@ name: Integration functional
 on:
   push:
     branches: [main, develop]
-  pull_request:
+  pull_request_target:
     branches: [main, develop]
+    types: [labeled, synchronize, opened, reopened]
 
 jobs:
   integration-functional:
     runs-on: ubuntu-latest
     timeout-minutes: 25
+    if: >-
+      github.event_name == 'push'
+      || contains(github.event.pull_request.labels.*.name, 'safe-to-test')
     env:
       # Use a repository *secret* (Settings → Secrets → Actions), not a variable.
       GH_TEST_REPO_TOKEN: ${{ secrets.GH_TEST_REPO_TOKEN }}
@@ -21,6 +25,7 @@ jobs:
     # actions/checkout v6.0.2
     - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
       with:
+        ref: ${{ github.event.pull_request.head.sha || github.sha }}
         persist-credentials: false
 
     # actions/setup-python v6.2.0
@@ -31,17 +36,11 @@ jobs:
     - name: Check GitHub test token availability
       run: |
         set -euo pipefail
-        if [ "${{ github.event_name }}" = "pull_request" ] && \
-           [ "${{ github.event.pull_request.head.repo.full_name }}" != "${{ github.repository }}" ]; then
-          echo "::notice::Fork PR: repository secrets (including GH_TEST_REPO_TOKEN)" \
-               "are not passed to workflows from forks."
-        fi
         if [ -n "${GH_TEST_REPO_TOKEN:-}" ]; then
           echo "GH_TEST_REPO_TOKEN is set (${#GH_TEST_REPO_TOKEN} characters)."
         else
           echo "::warning::GH_TEST_REPO_TOKEN is empty. E2E/Celery functional tests will be skipped."
           echo "Add a classic PAT with the 'repo' scope as repository secret GH_TEST_REPO_TOKEN."
-          echo "Re-run the workflow after saving the secret (secrets are not applied retroactively to old runs)."
         fi
 
     - name: Run integration functional tests
