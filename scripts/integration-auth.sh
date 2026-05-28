@@ -40,6 +40,6 @@ export WEBLATE_COMPOSE_FILE="${COMPOSE_FILE}"
 export WEBLATE_COMPOSE_PROJECT="${COMPOSE_PROJECT_NAME}"
 
 echo "=== Running auth tests ==="
-pip install --quiet pytest
+uv pip install --quiet --system --group integration
 python -m pytest --confcutdir=tests/integration --override-ini addopts= \
     tests/integration/test_auth.py -v
