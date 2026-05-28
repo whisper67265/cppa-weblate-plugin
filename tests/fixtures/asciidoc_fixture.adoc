@@ -1,11 +1,88 @@
-= AsciiDoc integration test fixture
+// Synthetic fixture for AsciiDoc parser tests.
+// Patterns adapted from Beast documentation (sections,
+// headings, tables with source blocks, description lists, admonitions, links).
 
-This is a short AsciiDoc document used by integration tests.
+= Complex AsciiDoc test fixture
 
-== Section one
+[#complex_fixture]
+== Complex AsciiDoc test fixture
 
-A paragraph with translatable prose for the functional test suite.
+This opening paragraph soft-wraps onto a second line while keeping an
+https://example.com/path[RFC-style link] and a named
+xref:message[`message`] reference in the same paragraph block.
 
-== Section two
+== Section headings and lists
 
-Another paragraph to ensure multiple units can be extracted when scanned.
+* First bullet names xref:request[`request`].
+* Second bullet continues the list with plain prose.
+
+[[anchor_skipped]]
+
+[#custom]
+=== Custom heading with id
+
+[quote]
+____
+This is a single-line blockquote for translation.
+____
+
+.NOTE
+====
+This is a multi-line admonition body. It contains a paragraph that should
+still be extracted when the note block is parsed recursively.
+
+A second paragraph inside the same note uses
+https://tools.ietf.org/html/rfc6455[WebSocket] markup.
+====
+
+[#nested_inner]
+== Nested section title here
+
+Inner section prose explains that `template` parameters accept any
+xref:fields[`fields`] type meeting requirements.
+The paragraph joins wrapped source lines into one translatable unit.
+
+[source]
+----
+// This indented line starts a code block (non-translatable).
+// It must not become its own translation unit.
+----
+
+After the code block, prose resumes with an image that is skipped:
+
+image::beast/images/message.png[width=100px,height=50px]
+
+.Message patterns
+|===
+|Name |Description
+
+|__message__
+a|```
+/// Class template overview
+template<class Body, class Fields>
+class message;
+```
+
+|xref:request[`request`]
+a|```
+/// HTTP request alias
+template<class Body, class Fields = fields>
+using request = message<true, Body, Fields>;
+```
+
+|Plain prose cell
+|This cell has human-readable text only, without a source block.
+|===
+
+[qanda]
+Does this fixture include a description list?::
+Yes. This pair mimics patterns from the FAQ chapter: quoted question
+strings and multi-sentence answers with blank-line-separated paragraphs.
+
+Second paragraph in the same answer cell.
+
+What about table titles?::
+The table above includes an explicit title line before the opening delimiter.
++
+
+.WARNING: This is a one-line warning about edge cases in handshakes.

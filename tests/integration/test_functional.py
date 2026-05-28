@@ -250,18 +250,9 @@ print("ok")
 # ---------------------------------------------------------------------------
 
 
-@dataclass(frozen=True)
-class AddOrUpdateTask:
-    task_id: str
-    http_code: int
-    response: dict
-
-
 @pytest.fixture(scope="class")
-def add_or_update_task(
-    api_token: str, test_repo: EphemeralGitHubRepo
-) -> AddOrUpdateTask:
-    """Accepted add-or-update request and Celery task id."""
+def add_or_update_task(api_token: str, test_repo: EphemeralGitHubRepo) -> str:
+    """Accepted add-or-update request; returns Celery task id."""
     owner = test_repo.resolve_owner()
     body = {
         "organization": owner,
@@ -278,27 +269,16 @@ def add_or_update_task(
     assert isinstance(data, dict)
     assert data.get("status") == "accepted"
     assert data.get("task_id")
-    return AddOrUpdateTask(
-        task_id=str(data["task_id"]),
-        http_code=code,
-        response=data,
-    )
+    return str(data["task_id"])
 
 
 class TestAddOrUpdateCeleryFlow:
     """POST /boost-endpoint/add-or-update/ and poll Celery completion."""
 
-    def test_add_or_update_returns_202(
-        self, add_or_update_task: AddOrUpdateTask
-    ) -> None:
-        assert add_or_update_task.http_code == 202
-        assert add_or_update_task.response.get("status") == "accepted"
-        assert add_or_update_task.task_id
-
     def test_add_or_update_task_completes(
-        self, weblate_api: WeblateAPI, add_or_update_task: AddOrUpdateTask
+        self, weblate_api: WeblateAPI, add_or_update_task: str
     ) -> None:
-        result = weblate_api.poll_celery_task(add_or_update_task.task_id, timeout=300.0)
+        result = weblate_api.poll_celery_task(add_or_update_task, timeout=300.0)
         assert isinstance(result, dict)
         lang_result = result.get(TEST_LANG_CODE)
         assert lang_result is not None
