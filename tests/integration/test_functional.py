@@ -11,6 +11,7 @@ for add-or-update / BoostComponentService tests.
 from __future__ import annotations
 
 import json
+from dataclasses import dataclass
 
 import pytest
 
@@ -31,6 +32,36 @@ KNOWN_SOURCE_STRING = "Complex QuickBook test fixture"
 ZH_HANS_TRANSLATION = "复杂 QuickBook 测试夹具"
 
 
+@dataclass(frozen=True)
+class CreatedProjectComponent:
+    project_slug: str
+    component_slug: str
+
+
+@pytest.fixture(scope="class")
+def created_project_component(weblate_api: WeblateAPI) -> CreatedProjectComponent:
+    """Project + QuickBook component for round-trip tests."""
+    project_slug = WeblateAPI.unique_slug("func-qbk")
+    component_slug = "qbk-fixture"
+    weblate_api.create_project("Functional QBK", project_slug)
+    # Docfile multipart upload (no empty local VCS template paths).
+    created = weblate_api.create_component_from_docfile(
+        project_slug,
+        name="QBK Fixture",
+        slug=component_slug,
+        file_format="quickbook",
+        docfile_path=QBK_FIXTURE,
+        filemask="doc/*.qbk",
+        language_regex=f"^{TEST_LANG_CODE}$",
+    )
+    component_slug = str(created.get("slug", component_slug))
+    weblate_api.ensure_translation(project_slug, component_slug, TEST_LANG_CODE)
+    return CreatedProjectComponent(
+        project_slug=project_slug,
+        component_slug=component_slug,
+    )
+
+
 # ---------------------------------------------------------------------------
 # P1: QuickBook round-trip via Weblate REST API
 # ---------------------------------------------------------------------------
@@ -39,34 +70,15 @@ ZH_HANS_TRANSLATION = "复杂 QuickBook 测试夹具"
 class TestQuickBookRoundTrip:
     """Upload QBK, translate a unit, download translated file."""
 
-    project_slug: str = ""
-    component_slug: str = ""
-    unit_url: str = ""
-
-    def test_create_project_and_component(self, weblate_api: WeblateAPI) -> None:
-        project_slug = WeblateAPI.unique_slug("func-qbk")
-        component_slug = "qbk-fixture"
-        weblate_api.create_project("Functional QBK", project_slug)
-        # Docfile multipart upload (no empty local VCS template paths).
-        created = weblate_api.create_component_from_docfile(
-            project_slug,
-            name="QBK Fixture",
-            slug=component_slug,
-            file_format="quickbook",
-            docfile_path=QBK_FIXTURE,
-            filemask="doc/*.qbk",
-            language_regex=f"^{TEST_LANG_CODE}$",
-        )
-        component_slug = str(created.get("slug", component_slug))
-        weblate_api.ensure_translation(project_slug, component_slug, TEST_LANG_CODE)
-
-        type(self).project_slug = project_slug
-        type(self).component_slug = component_slug
-
-    def test_units_extracted(self, weblate_api: WeblateAPI) -> None:
-        assert self.project_slug and self.component_slug
+    def test_units_extracted(
+        self,
+        weblate_api: WeblateAPI,
+        created_project_component: CreatedProjectComponent,
+    ) -> None:
         units = weblate_api.list_units(
-            self.project_slug, self.component_slug, TEST_LANG_CODE
+            created_project_component.project_slug,
+            created_project_component.component_slug,
+            TEST_LANG_CODE,
         )
         assert len(units) > 0
         sources = [
@@ -75,10 +87,15 @@ class TestQuickBookRoundTrip:
         ]
         assert any(KNOWN_SOURCE_STRING in s for s in sources), sources[:5]
 
-    def test_submit_translation(self, weblate_api: WeblateAPI) -> None:
-        assert self.project_slug and self.component_slug
+    def test_submit_translation(
+        self,
+        weblate_api: WeblateAPI,
+        created_project_component: CreatedProjectComponent,
+    ) -> None:
         units = weblate_api.list_units(
-            self.project_slug, self.component_slug, TEST_LANG_CODE
+            created_project_component.project_slug,
+            created_project_component.component_slug,
+            TEST_LANG_CODE,
         )
         match = next(
             (u for u in units if KNOWN_SOURCE_STRING in str(u.get("source", ""))),
@@ -86,16 +103,20 @@ class TestQuickBookRoundTrip:
         )
         assert match is not None
         unit_url = WeblateAPI.unit_api_url(match)
-        type(self).unit_url = unit_url
         weblate_api.submit_translation(unit_url, ZH_HANS_TRANSLATION)
 
-    def test_download_translated_qbk(self, weblate_api: WeblateAPI) -> None:
-        assert self.project_slug and self.component_slug
+    def test_download_translated_qbk(
+        self,
+        weblate_api: WeblateAPI,
+        created_project_component: CreatedProjectComponent,
+    ) -> None:
         raw = weblate_api.download_file(
-            self.project_slug, self.component_slug, TEST_LANG_CODE
+            created_project_component.project_slug,
+            created_project_component.component_slug,
+            TEST_LANG_CODE,
         )
         text = raw.decode("utf-8", errors="replace")
-        assert ZH_HANS_TRANSLATION in text or KNOWN_SOURCE_STRING in text
+        assert ZH_HANS_TRANSLATION in text, "translated QBK content was not found"
 
 
 # ---------------------------------------------------------------------------
@@ -229,37 +250,55 @@ print("ok")
 # ---------------------------------------------------------------------------
 
 
+@dataclass(frozen=True)
+class AddOrUpdateTask:
+    task_id: str
+    http_code: int
+    response: dict
+
+
+@pytest.fixture(scope="class")
+def add_or_update_task(
+    api_token: str, test_repo: EphemeralGitHubRepo
+) -> AddOrUpdateTask:
+    """Accepted add-or-update request and Celery task id."""
+    owner = test_repo.resolve_owner()
+    body = {
+        "organization": owner,
+        "version": TEST_VERSION,
+        "add_or_update": {TEST_LANG_CODE: [test_repo.repo_name]},
+    }
+    code, data = http_json(
+        "POST",
+        "/boost-endpoint/add-or-update/",
+        token=api_token,
+        body=body,
+    )
+    assert code == 202, f"expected 202: {code} {data}"
+    assert isinstance(data, dict)
+    assert data.get("status") == "accepted"
+    assert data.get("task_id")
+    return AddOrUpdateTask(
+        task_id=str(data["task_id"]),
+        http_code=code,
+        response=data,
+    )
+
+
 class TestAddOrUpdateCeleryFlow:
     """POST /boost-endpoint/add-or-update/ and poll Celery completion."""
 
     def test_add_or_update_returns_202(
-        self, api_token: str, test_repo: EphemeralGitHubRepo
+        self, add_or_update_task: AddOrUpdateTask
     ) -> None:
-        owner = test_repo.resolve_owner()
-        body = {
-            "organization": owner,
-            "version": TEST_VERSION,
-            "add_or_update": {TEST_LANG_CODE: [test_repo.repo_name]},
-        }
-        code, data = http_json(
-            "POST",
-            "/boost-endpoint/add-or-update/",
-            token=api_token,
-            body=body,
-        )
-        assert code == 202, f"expected 202: {code} {data}"
-        assert isinstance(data, dict)
-        assert data.get("status") == "accepted"
-        assert data.get("task_id")
-        type(self).task_id = str(data["task_id"])
+        assert add_or_update_task.http_code == 202
+        assert add_or_update_task.response.get("status") == "accepted"
+        assert add_or_update_task.task_id
 
     def test_add_or_update_task_completes(
-        self, weblate_api: WeblateAPI, test_repo: EphemeralGitHubRepo
+        self, weblate_api: WeblateAPI, add_or_update_task: AddOrUpdateTask
     ) -> None:
-        task_id = getattr(self, "task_id", None)
-        if not task_id:
-            pytest.skip("depends on test_add_or_update_returns_202")
-        result = weblate_api.poll_celery_task(task_id, timeout=300.0)
+        result = weblate_api.poll_celery_task(add_or_update_task.task_id, timeout=300.0)
         assert isinstance(result, dict)
         lang_result = result.get(TEST_LANG_CODE)
         assert lang_result is not None

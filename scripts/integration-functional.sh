@@ -40,7 +40,13 @@ export WEBLATE_COMPOSE_FILE="${COMPOSE_FILE}"
 export WEBLATE_COMPOSE_PROJECT="${COMPOSE_PROJECT_NAME}"
 
 echo "=== Extracting Weblate SSH public key ==="
-export WEBLATE_SSH_PUBKEY="$(compose exec -T weblate cat /app/data/ssh/id_rsa.pub)"
+TMP_WEBLATE_SSH_PUBKEY="$(compose exec -T weblate cat /app/data/ssh/id_rsa.pub)"
+if [[ -z "${TMP_WEBLATE_SSH_PUBKEY}" ]]; then
+    echo "ERROR: Failed to read Weblate SSH public key from container." >&2
+    exit 1
+fi
+export WEBLATE_SSH_PUBKEY="${TMP_WEBLATE_SSH_PUBKEY}"
+unset TMP_WEBLATE_SSH_PUBKEY
 
 if [[ -n "${GH_TEST_REPO_TOKEN:-}" ]]; then
     export GH_TEST_REPO_TOKEN
