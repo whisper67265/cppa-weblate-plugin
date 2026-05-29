@@ -5,19 +5,15 @@
 name: Lint and format
 
 on:
-  pull_request:
-  push:
-    branches:
-    - main
-    - develop
+  workflow_call:
 
 permissions:
   contents: read
 
 jobs:
   lint-and-format:
+    name: Lint and format
     runs-on: ubuntu-latest
-
     steps:
     # actions/checkout v6.0.2
     - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd

@@ -2,18 +2,20 @@
 #
 # SPDX-License-Identifier: BSL-1.0
 
-name: Integration smoke
+name: Combination auth
 
 on:
-  push:
-    branches: [main, develop]
-  pull_request:
-    branches: [main, develop]
+  workflow_call:
+
+permissions:
+  actions: write
+  contents: read
 
 jobs:
-  integration-smoke:
+  combination-auth:
+    name: Combination auth
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 10
     steps:
     # actions/checkout v6.0.2
     - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
@@ -30,13 +32,13 @@ jobs:
       with:
         version: 0.11.12
 
-    - name: Run integration smoke tests
-      run: bash scripts/integration-smoke.sh
+    - name: Run integration auth tests
+      run: bash scripts/integration-auth.sh
 
     - name: Upload logs on failure
       if: failure()
       # actions/upload-artifact v4.6.2
       uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
       with:
-        name: integration-smoke-logs
+        name: ci-combination-auth-logs
         path: /tmp/compose-logs.txt

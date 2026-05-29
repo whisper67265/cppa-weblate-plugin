@@ -11,7 +11,7 @@ import os
 import subprocess
 from typing import Any
 
-_COMPOSE_FILE = os.environ.get("WEBLATE_COMPOSE_FILE", "docker/docker-compose.yml")
+_COMPOSE_FILE = os.environ.get("WEBLATE_COMPOSE_FILE", "docker/docker-compose.ci.yml")
 _COMPOSE_PROJECT = os.environ.get("WEBLATE_COMPOSE_PROJECT", "cppa-weblate-plugin")
 _PYTHON = "/app/venv/bin/python"
 

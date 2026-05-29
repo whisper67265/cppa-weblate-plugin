@@ -10,7 +10,7 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 export REPO_ROOT
 
-COMPOSE_FILE="${COMPOSE_FILE:-${REPO_ROOT}/docker/docker-compose.yml}"
+COMPOSE_FILE="${COMPOSE_FILE:-${REPO_ROOT}/docker/docker-compose.ci.yml}"
 export COMPOSE_FILE
 
 COMPOSE_PROJECT_NAME="${COMPOSE_PROJECT_NAME:-cppa-weblate-plugin}"

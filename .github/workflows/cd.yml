@@ -1,0 +1,59 @@
+# SPDX-FileCopyrightText: 2026 William Jin <AuraMindNest@outlook.com>
+#
+# SPDX-License-Identifier: BSL-1.0
+
+name: CD
+
+# workflow_run grants an elevated GITHUB_TOKEN by default. Mitigations:
+#   - permissions: contents: read (no write access)
+#   - job-level 'if' requires conclusion == 'success' AND event == 'push'
+#     (ignores PRs, forks, and failed/cancelled runs)
+on:
+  workflow_run:
+    workflows: [CI]
+    branches: [develop]
+    types: [completed]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-${{ github.event.workflow_run.head_branch }}
+  cancel-in-progress: false
+
+jobs:
+  cd:
+    if: >-
+      github.event.workflow_run.conclusion == 'success'
+      && github.event.workflow_run.event == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: staging
+    steps:
+    - name: Deploy via SSH
+      uses: appleboy/ssh-action@0ff4204d59e8e51228ff73bce53f80d53301dee2
+      with:
+        host: ${{ secrets.SSH_HOST }}
+        username: ${{ secrets.SSH_USER }}
+        key: ${{ secrets.SSH_PRIVATE_KEY }}
+        script: |
+          set -euo pipefail
+          cd /opt/cppa-weblate-plugin
+          git fetch origin develop
+          git checkout develop
+          git pull origin develop
+          docker compose -f docker/docker-compose.cd.yml --env-file .env build
+          docker compose -f docker/docker-compose.cd.yml --env-file .env up -d
+          set -a
+          # shellcheck disable=SC1091
+          [ -f .env ] && . ./.env
+          set +a
+          WEBLATE_PORT="${WEBLATE_PORT:-8080}"
+          WEBLATE_URL_PREFIX="${WEBLATE_URL_PREFIX:-}"
+          for i in $(seq 1 36); do
+            curl -sf "http://127.0.0.1:${WEBLATE_PORT}${WEBLATE_URL_PREFIX}/healthz/" && exit 0
+            sleep 5
+          done
+          echo "Weblate not healthy after 180s"
+          docker compose -f docker/docker-compose.cd.yml --env-file .env logs weblate | tail -40
+          exit 1

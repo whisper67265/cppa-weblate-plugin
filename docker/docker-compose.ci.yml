@@ -2,9 +2,9 @@
 #
 # SPDX-License-Identifier: BSL-1.0
 
-# Shared Docker Compose stack for integration tests and CD deployments.
-# CI: docker compose -f docker/docker-compose.yml build && up
-# CD: same file, overridden via .env on the deploy server.
+# CI / integration tests: bundled PostgreSQL + Redis + Weblate (ephemeral Postgres).
+# CI: docker compose -f docker/docker-compose.ci.yml build && docker compose -f docker/docker-compose.ci.yml up -d
+# CD: docker compose -f docker/docker-compose.cd.yml --env-file .env up -d
 
 services:
   postgresql:

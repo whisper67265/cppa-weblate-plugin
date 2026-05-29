@@ -20,52 +20,39 @@ SPDX-License-Identifier: BSL-1.0
 
 Additional formats should follow the same split: a thin class under `src/boost_weblate/formats/` that plugs into Weblate's format APIs, with parsing and reconstruction under `src/boost_weblate/utils/`.
 
-## Quickstart
+## Quick Start
 
-Clone the repository, create a local virtual environment with [uv](https://docs.astral.sh/uv/), activate it, and install the package in editable mode with development dependencies (hook runner and test tooling):
+### Local development
 
 ```bash
 git clone https://github.com/cppalliance/cppa-weblate-plugin.git
 cd cppa-weblate-plugin
 uv venv
 source .venv/bin/activate
-# Windows (PowerShell): .venv\Scripts\Activate.ps1
 uv pip install -e '.[dev]'
-```
-
-Run the test suite:
-
-```bash
 pytest
 ```
 
-Run with the same coverage gate as CI (terminal + XML + HTML, 90% minimum on `boost_weblate`):
+### Docker (CI stack)
+
+Build the full Weblate + PostgreSQL + Redis stack locally using the CI Compose file:
 
 ```bash
-pytest -v --tb=short \
-  --cov=boost_weblate \
-  --cov-report=term-missing \
-  --cov-report=xml:coverage.xml \
-  --cov-report=html:htmlcov \
-  --cov-fail-under=90
-coverage report
+docker compose -f docker/docker-compose.ci.yml build
+docker compose -f docker/docker-compose.ci.yml up -d
 ```
 
-(`coverage.xml`, `htmlcov/`, and `.coverage` are gitignored; open `htmlcov/index.html` locally to browse line coverage.)
+Weblate is available at `http://localhost:8080` once the healthcheck passes (admin / `admin`). The CI stack uses ephemeral Postgres on tmpfs — data does not persist across restarts.
 
-Run the same checks CI uses (lint, reuse, workflow lint, and pytest via [prek](https://pypi.org/project/prek/) reading `.pre-commit-config.yaml`):
+### Docker (CD / staging)
+
+For persistent deployment with host PostgreSQL and shared Redis, see [docs/deployment-runbook.md](docs/deployment-runbook.md). Quick version:
 
 ```bash
-prek run --all-files --show-diff-on-failure
+cp .env.example .env          # fill in secrets; see .env.example comments
+docker compose -f docker/docker-compose.cd.yml --env-file .env build
+docker compose -f docker/docker-compose.cd.yml --env-file .env up -d
 ```
-
-Install Git hooks so those checks run on each commit:
-
-```bash
-prek install
-```
-
-**Alternative with uv groups:** if you prefer a project-local environment managed entirely by uv, `uv sync --group pre-commit` installs the hook runner and pytest into the uv environment; then use `uv run --only-group pre-commit prek run --all-files --show-diff-on-failure` and `uv run --only-group pre-commit prek install`. If you use the classic `pre-commit` CLI instead of prek, install it separately and run `pre-commit install` after syncing dependencies.
 
 ## Architecture
 
@@ -77,29 +64,34 @@ flowchart TB
     WF["WEBLATE_FORMATS"]
     CF["ConvertFormat / store"]
     RP["real_patterns (URL list)"]
+    CEL["Celery worker"]
   end
   subgraph plugin["boost_weblate"]
+    SO["settings_override.py"]
     FMT["formats/ — format adapters"]
     UTL["utils/ — parse & serialize"]
     EP["endpoint/ — HTTP API + Celery"]
-    TST["tests/ — mirrors src layout"]
   end
+  SO --> WF
+  SO --> INST["INSTALLED_APPS"]
   WF --> FMT
   FMT --> CF
   FMT --> UTL
+  INST --> EP
   EP -->|AppConfig.ready()| RP
-  TST -.-> FMT
-  TST -.-> UTL
-  TST -.-> EP
+  EP -->|add-or-update| CEL
+  CEL --> EP
 ```
+
+- **`src/boost_weblate/settings_override.py`** — Docker `exec()` fragment: sets `WEBLATE_FORMATS` and appends `BoostEndpointConfig` to `INSTALLED_APPS`. Copied to `/app/data/settings-override.py` by the Dockerfile. See [WEBLATE_FORMATS configuration](#weblate_formats-configuration) and [WEBLATE_ADD_APPS](#weblate_add_apps).
 
 - **`src/boost_weblate/formats/`** — Weblate-facing **format classes** (subclasses of Weblate's `BaseFormat` family, such as `weblate.formats.convert.ConvertFormat`). `QuickBookFormat` follows the same pattern as built-in convert formats (for example AsciiDoc): it turns a template file into a translation store and, on save, applies translations back using the template plus the store.
 
 - **`src/boost_weblate/utils/`** — **Format-specific logic** with no Weblate import cycle: QuickBook parsing, segment extraction, translate-toolkit storage (`QuickBookFile` / `QuickBookUnit`), and reconstruction (`QuickBookTranslator`). New formats should add a sibling module (or package) here.
 
-- **`src/boost_weblate/endpoint/`** — **HTTP API** for Boost documentation project/component management. Exposes three routes under `/boost-endpoint/` (see [Routes](#routes)), uses Django REST Framework for auth and serialization, and hands off heavy work to a Celery task (see [Celery task](#celery-task)).
+- **`src/boost_weblate/endpoint/`** — **HTTP API** for Boost documentation project/component management. Exposes three routes under `/boost-endpoint/` (see [Boost endpoint routes](#boost-endpoint-routes)), uses Django REST Framework for auth and serialization, and hands off heavy work to a Celery task (see [Celery requirement for add-or-update](#celery-requirement-for-add-or-update)).
 
-- **`tests/`** — **Pytest** layout mirrors `src/boost_weblate/` (`tests/formats/`, `tests/utils/`, `tests/endpoint/`). Shared fixtures live under `tests/fixtures/`. `tests/conftest.py` configures `sys.path`, sets `DJANGO_SETTINGS_MODULE` to `tests.django_qbk_format_settings`, and calls `django.setup()` so format tests can load Weblate's Django stack without requiring PostgreSQL.
+- **`tests/`** — **Pytest** layout mirrors `src/boost_weblate/` (`tests/formats/`, `tests/utils/`, `tests/endpoint/`). Shared fixtures live under `tests/fixtures/`. `tests/conftest.py` configures `sys.path`, sets `DJANGO_SETTINGS_MODULE` to `tests.django_qbk_format_settings`, and calls `django.setup()` so format tests can load Weblate's Django stack without requiring PostgreSQL. Docker-based integration tests live in `tests/integration/`.
 
 ## WEBLATE_FORMATS configuration
 
@@ -144,9 +136,9 @@ where `_ENDPOINT_APP_CONFIG = "boost_weblate.endpoint.apps.BoostEndpointConfig"`
 
 > **Important:** if you set `WEBLATE_ADD_APPS=boost_weblate.endpoint.apps.BoostEndpointConfig` **and** deploy `settings_override.py`, the app will be added to `INSTALLED_APPS` twice, which raises a `django.core.exceptions.ImproperlyConfigured` error at startup. Remove one source.
 
-Note that adding the app to `INSTALLED_APPS` (by either method) is **necessary but not sufficient** for HTTP routes to be active — see [Routes](#routes) below for why.
+Note that adding the app to `INSTALLED_APPS` (by either method) is **necessary but not sufficient** for HTTP routes to be active — see [Boost endpoint routes](#boost-endpoint-routes) below for why.
 
-## Routes
+## Boost Endpoint Routes
 
 The plugin exposes three HTTP endpoints, all under the `/boost-endpoint/` prefix on the Weblate site:
 
@@ -155,6 +147,8 @@ The plugin exposes three HTTP endpoints, all under the `/boost-endpoint/` prefix
 | `GET` | `/boost-endpoint/plugin-ping/` | `plugin_ping` | None | `200 ok` (plain text) |
 | `GET` | `/boost-endpoint/info/` | `BoostEndpointInfo` | Required | `200` JSON: `module`, `version`, `capabilities` |
 | `POST` | `/boost-endpoint/add-or-update/` | `AddOrUpdateView` | Required | `202` JSON: `status`, `task_id`, `detail` |
+
+When `WEBLATE_URL_PREFIX` is set (e.g. `/weblate`), all paths are prefixed accordingly: `/weblate/boost-endpoint/plugin-ping/`, etc.
 
 ### Why routes need explicit registration
 
@@ -208,9 +202,9 @@ The operation is idempotent (guarded by a `_cppa_boost_weblate_urls_registered` 
 
 The view validates the request with `AddOrUpdateRequestSerializer`, dispatches the Celery task, and returns immediately. A `400` response with an `errors` object is returned if validation fails.
 
-## Celery task
+## Celery Requirement for add-or-update
 
-Heavy work (git clone, file scanning, Weblate project/component create-or-update) runs asynchronously in a Celery worker via `boost_add_or_update_task` (`src/boost_weblate/endpoint/tasks.py`). The view enqueues the task with `.delay()` and returns HTTP 202 immediately.
+The `POST /boost-endpoint/add-or-update/` endpoint **requires a running Celery worker**. The view enqueues `boost_add_or_update_task` via `.delay()` and returns HTTP 202 immediately — if no worker is consuming the queue, the task sits indefinitely.
 
 ```text
 POST /boost-endpoint/add-or-update/
@@ -232,24 +226,21 @@ boost_add_or_update_task.delay(
                         returns dict[lang_code → result]
 ```
 
-**Task signature:**
+**Task details:**
 
-```python
-@app.task(trail=False)
-def boost_add_or_update_task(
-    *,
-    organization: str,
-    add_or_update: dict[str, list[str]],
-    version: str,
-    extensions: list[str] | None,
-    user_id: int,
-) -> dict[str, Any]:
-```
-
-- Uses Weblate's own Celery `app` instance (`weblate.utils.celery.app`), so it runs in the same worker pool as all other Weblate tasks with no extra broker configuration.
+- Registered on Weblate's own Celery app (`weblate.utils.celery.app`), so it runs in the same worker pool as all other Weblate tasks with no extra broker configuration.
 - `user_id` is passed instead of the `User` object because Celery serializes task arguments to JSON; the task re-fetches the user from the database inside the worker.
 - Exceptions propagate unhandled so Celery marks the task as `FAILURE` and monitoring/alerting can act on it.
 - `trail=False` suppresses Celery's default task-result trail to avoid unbounded result-backend growth.
+
+**Verifying the worker is running:**
+
+```bash
+docker compose -f docker/docker-compose.cd.yml --env-file .env \
+  exec -T weblate /app/venv/bin/celery -A weblate.utils.celery inspect ping
+```
+
+The CD stack sets `CELERY_SINGLE_PROCESS=1` by default (single worker process). Increase this in `.env` for heavier workloads.
 
 **`BoostComponentService`** (`src/boost_weblate/endpoint/services.py`) performs the actual work for each language:
 
@@ -262,15 +253,84 @@ def boost_add_or_update_task(
 
 The service has no plugin-owned models; it operates entirely through Weblate's Django ORM.
 
+## CI / CD Pipelines
+
+### CI (`ci.yml`)
+
+Triggered on push and PR to `main` and `develop`. Calls seven reusable sub-workflows:
+
+| Job | Workflow | What it checks |
+|-----|----------|----------------|
+| `lint` | [`.github/workflows/ci-lint.yml`](.github/workflows/ci-lint.yml) | prek (Ruff, YAML/TOML, REUSE, actionlint, pytest) |
+| `test` | [`.github/workflows/ci-test.yml`](.github/workflows/ci-test.yml) | pytest + 90% coverage gate (`--cov-fail-under=90`) |
+| `package` | [`.github/workflows/ci-package.yml`](.github/workflows/ci-package.yml) | `uv build`, twine, pydistcheck, pyroma, check-wheel-contents, check-manifest |
+| `dependencies` | [`.github/workflows/ci-dependencies.yml`](.github/workflows/ci-dependencies.yml) | pip-audit, liccheck, dependency review (on PRs) |
+| `combination-smoke` | [`.github/workflows/ci-combination-smoke.yml`](.github/workflows/ci-combination-smoke.yml) | Docker stack → P0 smoke tests (`scripts/integration-smoke.sh`) |
+| `combination-auth` | [`.github/workflows/ci-combination-auth.yml`](.github/workflows/ci-combination-auth.yml) | Docker stack → auth tests (`scripts/integration-auth.sh`) |
+| `combination-functional` | [`.github/workflows/ci-combination-functional.yml`](.github/workflows/ci-combination-functional.yml) | Docker stack → E2E functional tests (`scripts/integration-functional.sh`); optional `GH_TEST_REPO_TOKEN` secret for GitHub-backed tests |
+
+All `ci-combination-*` jobs build the CI Docker stack (`docker/docker-compose.ci.yml`), wait for the healthcheck, create an API token, run the corresponding pytest suite under `tests/integration/`, and tear down.
+
+### CD (`cd.yml`)
+
+Triggered after CI succeeds on a `develop` push. SSHes into the staging server at `/opt/cppa-weblate-plugin`, pulls the latest code, rebuilds the CD Docker image (`docker/docker-compose.cd.yml`), brings the stack up, and polls `${WEBLATE_URL_PREFIX}/healthz/` on `WEBLATE_PORT` (from `.env`) for up to 180 s. On failure, logs the last 40 lines and exits non-zero. Concurrency is locked per branch so deploys never overlap.
+
+Full deployment procedure: [docs/deployment-runbook.md](docs/deployment-runbook.md).
+
+### Running integration tests locally
+
+```bash
+# Smoke (P0 — container boot, format registration, URL registration):
+bash scripts/integration-smoke.sh
+
+# Auth (token auth on protected routes; ping stays public):
+bash scripts/integration-auth.sh
+
+# Functional (QuickBook round-trip, BoostComponentService E2E, Celery flow):
+# Set GH_TEST_REPO_TOKEN for GitHub-backed tests; unset to skip them.
+export GH_TEST_REPO_TOKEN=ghp_...
+bash scripts/integration-functional.sh
+```
+
+Each script builds `docker/docker-compose.ci.yml`, waits for health, runs its pytest suite, and tears down the stack.
+
+## Environment & Configuration Reference
+
+| Topic | File | Description |
+|-------|------|-------------|
+| All env vars | [`.env.example`](.env.example) | Annotated template — copy to `.env` on the deploy server |
+| Deployment steps | [`docs/deployment-runbook.md`](docs/deployment-runbook.md) | Install, env vars, health checks, troubleshooting |
+| API reference | [`docs/boost-endpoint-api.md`](docs/boost-endpoint-api.md) | Full request/response docs for the Boost endpoint |
+| Route registration | [`docs/plugin-http-routes.md`](docs/plugin-http-routes.md) | How and why routes are registered at startup |
+| Docker files | [`docker/README.md`](docker/README.md) | Dockerfile and Compose usage for CI and CD |
+| CI/CD workflows | [`.github/README.md`](.github/README.md) | Workflow index and secrets reference |
+
 ## Contributing
 
 - **Hooks:** use prek (or classic pre-commit) with `.pre-commit-config.yaml` so local runs match CI (Ruff, YAML/TOML checks, REUSE, actionlint, pytest).
 
+```bash
+uv pip install -e '.[dev]'
+prek install
+prek run --all-files --show-diff-on-failure
+```
+
 - **Tests:** add tests next to the code you touch (`tests/formats/`, `tests/utils/`, or `tests/endpoint/`). Keep `django.setup()`-friendly patterns; heavy DB or migration suites are intentionally avoided in the bundled Django test settings.
 
-- **CI coverage:** the *Lint and format* workflow runs a **Tests and coverage** job that prints `term-missing` output, runs `coverage report`, writes `coverage.xml` and `htmlcov/`, and uploads those plus `.coverage` as a workflow artifact (download from the run's *Artifacts* section on GitHub). Coverage is configured in `pyproject.toml` (`[tool.coverage.*]`); the job uses `uv sync --frozen --group dev --group pre-commit` so `pytest-cov` and `coverage[toml]` match the lockfile.
+- **Coverage:** the CI test job enforces 90% minimum on `boost_weblate`. Run locally:
 
-- **Pull requests:** open PRs against the default branch on GitHub. Keep changes focused; ensure CI is green (build/wheel checks, lint, tests). Respond to review feedback on the PR thread; for design questions or bug reports, use [Issues](https://github.com/cppalliance/cppa-weblate-plugin/issues).
+```bash
+pytest -v --tb=short \
+  --cov=boost_weblate \
+  --cov-report=term-missing \
+  --cov-report=xml:coverage.xml \
+  --cov-report=html:htmlcov \
+  --cov-fail-under=90
+```
+
+(`coverage.xml`, `htmlcov/`, and `.coverage` are gitignored; open `htmlcov/index.html` locally to browse line coverage.)
+
+- **Pull requests:** open PRs against the default branch on GitHub. Keep changes focused; ensure CI is green. Respond to review feedback on the PR thread; for design questions or bug reports, use [Issues](https://github.com/cppalliance/cppa-weblate-plugin/issues).
 
 ## License
 

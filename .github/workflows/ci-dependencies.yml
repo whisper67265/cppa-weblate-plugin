@@ -5,14 +5,14 @@
 name: Dependency audit
 
 on:
-  push:
-  pull_request:
+  workflow_call:
 
 permissions:
   contents: read
 
 jobs:
-  dep-audit:
+  dependency-audit:
+    name: Dependency audit
     runs-on: ubuntu-latest
     steps:
     # actions/checkout v6.0.2

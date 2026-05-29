@@ -1,0 +1,32 @@
+# SPDX-FileCopyrightText: 2026 William Jin <AuraMindNest@outlook.com>
+#
+# SPDX-License-Identifier: BSL-1.0
+
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+permissions:
+  actions: write
+  contents: read
+
+jobs:
+  lint:
+    uses: ./.github/workflows/ci-lint.yml
+  test:
+    uses: ./.github/workflows/ci-test.yml
+  package:
+    uses: ./.github/workflows/ci-package.yml
+  dependencies:
+    uses: ./.github/workflows/ci-dependencies.yml
+  combination-smoke:
+    uses: ./.github/workflows/ci-combination-smoke.yml
+  combination-functional:
+    uses: ./.github/workflows/ci-combination-functional.yml
+    secrets: inherit
+  combination-auth:
+    uses: ./.github/workflows/ci-combination-auth.yml

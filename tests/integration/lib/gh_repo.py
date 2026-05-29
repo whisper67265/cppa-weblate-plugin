@@ -123,10 +123,32 @@ class EphemeralGitHubRepo:
             expected=(201,),
         )
 
+    def ensure_branch(self, branch: str) -> None:
+        """Create branch from the repo default if it does not exist yet."""
+        owner = self.resolve_owner()
+        repo = self._request("GET", f"/repos/{owner}/{self.repo_name}")
+        assert isinstance(repo, dict)
+        default_branch = str(repo.get("default_branch") or "main")
+        ref_path = f"/repos/{owner}/{self.repo_name}/git/ref/heads/{branch}"
+        existing = self._request("GET", ref_path, expected=(200, 404))
+        if isinstance(existing, dict) and existing.get("object"):
+            return
+        default_ref = self._request(
+            "GET",
+            f"/repos/{owner}/{self.repo_name}/git/ref/heads/{default_branch}",
+        )
+        assert isinstance(default_ref, dict)
+        sha = default_ref["object"]["sha"]
+        self._request(
+            "POST",
+            f"/repos/{owner}/{self.repo_name}/git/refs",
+            body={"ref": f"refs/heads/{branch}", "sha": sha},
+            expected=(201,),
+        )
+
     def push_fixtures(self, fixture_dir: Path, branch: str) -> None:
         """Upload fixture files under doc/ on the given branch."""
-        owner = self.resolve_owner()
-        # Create branch from default if needed via initial commit on branch
+        self.ensure_branch(branch)
         files = [
             ("doc/quickbook_fixture.qbk", "quickbook_fixture.qbk"),
             ("doc/asciidoc_fixture.adoc", "asciidoc_fixture.adoc"),
@@ -141,8 +163,6 @@ class EphemeralGitHubRepo:
                 branch,
                 message=f"Add {dest} for integration tests",
             )
-        # Ensure branch exists as default for clones
-        _ = owner
 
     def add_deploy_key(self, public_key: str, title: str = "weblate-ci") -> None:
         """Register read-only deploy key on the repo."""
@@ -176,7 +196,14 @@ class EphemeralGitHubRepo:
 
 
 def default_repo_name() -> str:
-    """Unique repo name for this CI run."""
+    """Unique repo name for this CI run.
+
+    Keep short: Weblate project slug is
+    ``boost-{repo}-documentation-{lang}`` (max ~60 chars).
+    """
     run_id = os.environ.get("GITHUB_RUN_ID", os.environ.get("PYTEST_XDIST_WORKER", ""))
-    suffix = run_id or os.getpid()
-    return f"cppa-weblate-func-test-{suffix}"
+    suffix = str(run_id or os.getpid())
+    # Use tail of run id so long GITHUB_RUN_ID values stay within slug limits.
+    if len(suffix) > 10:
+        suffix = suffix[-10:]
+    return f"cppa-wl-ft-{suffix}"

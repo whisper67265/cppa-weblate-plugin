@@ -32,6 +32,21 @@ KNOWN_SOURCE_STRING = "Complex QuickBook test fixture"
 ZH_HANS_TRANSLATION = "复杂 QuickBook 测试夹具"
 
 
+def _assert_process_all_ok(
+    process_all: dict, *, require_component_changes: bool = False
+) -> None:
+    """Assert BoostComponentService.process_all() succeeded for every submodule."""
+    assert process_all.get("failed", 0) == 0, process_all
+    results = process_all.get("submodule_results", [])
+    assert results, process_all
+    for entry in results:
+        assert entry.get("success") is True, entry
+        if require_component_changes:
+            created = entry.get("components_created", 0)
+            updated = entry.get("components_updated", 0)
+            assert created + updated > 0, entry
+
+
 @dataclass(frozen=True)
 class CreatedProjectComponent:
     project_slug: str
@@ -218,7 +233,10 @@ print(json.dumps(out))
         )
         assert out.get("project_slug")
         assert out.get("component_count_before") == 0
-        assert out["component_count"] > 0
+        _assert_process_all_ok(
+            out.get("process_all", {}), require_component_changes=True
+        )
+        assert out["component_count"] > 0, out
         slug = out["project_slug"]
         check = exec_python(
             f"""
@@ -241,6 +259,7 @@ print("ok")
                 self._service_snippet(test_repo, run_process_all=True, run_twice=True)
             )
         )
+        assert out.get("component_count", 0) > 0, out
         assert out.get("idempotent") is True
 
 
@@ -282,9 +301,8 @@ class TestAddOrUpdateCeleryFlow:
         assert isinstance(result, dict)
         lang_result = result.get(TEST_LANG_CODE)
         assert lang_result is not None
-        # At least one submodule processed without fatal errors
-        assert isinstance(lang_result, list)
-        assert len(lang_result) > 0
+        assert isinstance(lang_result, dict), lang_result
+        _assert_process_all_ok(lang_result)
 
     def test_add_or_update_invalid_returns_400(self, api_token: str) -> None:
         code, data = http_json(

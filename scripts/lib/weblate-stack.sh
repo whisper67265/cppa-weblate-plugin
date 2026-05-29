@@ -42,6 +42,25 @@ stack_wait_healthy() {
     return 1
 }
 
+stack_ensure_github_known_hosts() {
+    # Weblate git uses GIT_SSH with UserKnownHostsFile=/app/data/ssh/known_hosts
+    # and StrictHostKeyChecking=yes. Celery/component sync over git@github.com fails
+    # with "No ED25519 host key is known for github.com" unless this is seeded.
+    echo "Ensuring github.com host keys in Weblate known_hosts..."
+    compose exec -T weblate sh -c '
+        set -e
+        kh=/app/data/ssh/known_hosts
+        touch "$kh"
+        if ! grep -q "^github.com " "$kh" 2>/dev/null; then
+            ssh-keyscan -t ed25519,rsa github.com >> "$kh" 2>/dev/null || true
+        fi
+        if ! grep -q "^github.com " "$kh"; then
+            echo "ERROR: failed to add github.com to $kh" >&2
+            exit 1
+        fi
+    '
+}
+
 stack_create_token() {
     local user="${1:-admin}"
     # Use python -c (not `weblate shell`) so stdout is only the key
