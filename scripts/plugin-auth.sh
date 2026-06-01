@@ -2,7 +2,7 @@
 # SPDX-FileCopyrightText: 2026 Andrew Zhang <whisper67265@outlook.com>
 # SPDX-License-Identifier: BSL-1.0
 
-# Integration auth test entrypoint.
+# Plugin auth test entrypoint.
 # Builds the stack, waits for health, creates a token, runs auth tests.
 # On exit (success or failure): collects logs and tears down the stack.
 

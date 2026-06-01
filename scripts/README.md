@@ -10,13 +10,15 @@ Reusable shell scripts for CI and CD.
 
 - **lib/compose.sh** — Sets `COMPOSE_FILE`, `COMPOSE_PROJECT_NAME`, exports `compose()` wrapper.
 - **lib/weblate-stack.sh** — Stack lifecycle functions: `stack_build`, `stack_up`, `stack_wait_healthy`, `stack_create_token`, `stack_logs`, `stack_down`.
-- **integration-smoke.sh** — CI entrypoint for P0 smoke tests (build, start, health-check, test, teardown).
+- **plugin-smoke.sh** — CI entrypoint for P0 smoke tests (build, start, health-check, test, teardown).
+- **plugin-auth.sh** — CI entrypoint for auth and rate-limit tests.
+- **plugin-functional.sh** — CI entrypoint for E2E functional tests (optional GitHub repo).
 
 ## Usage
 
 ```bash
 # Run smoke tests locally:
-bash scripts/integration-smoke.sh
+bash scripts/plugin-smoke.sh
 
 # Source the library for custom workflows:
 source scripts/lib/weblate-stack.sh

@@ -2,7 +2,7 @@
 #
 # SPDX-License-Identifier: BSL-1.0
 
-"""P2 integration auth tests.
+"""P2 plugin auth tests.
 
 Verifies authentication and authorization behavior across all
 Boost endpoint routes:

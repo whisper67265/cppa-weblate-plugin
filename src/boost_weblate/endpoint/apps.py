@@ -17,7 +17,7 @@ _PLUGIN_URLS_ATTR = "_cppa_boost_weblate_urls_registered"
 def register_plugin_urls() -> None:
     """Append this app's routes to Weblate's pattern list.
 
-    This is the supported integration path: at process
+    This is the supported plugin path: at process
     startup, append a single ``path("boost-endpoint/", ...)`` entry to
     ``weblate.urls.real_patterns`` so routes stay under Weblate's ``URL_PREFIX``
     handling.
@@ -26,7 +26,7 @@ def register_plugin_urls() -> None:
     ``add-or-update/``, and ``plugin-ping/`` (see ``boost_weblate.endpoint.urls``).
 
     Weblate builds ``urlpatterns`` from module-level ``real_patterns`` (see
-    ``weblate.urls``). Optional integrations append to ``real_patterns`` before
+    ``weblate.urls``). Optional plugins append to ``real_patterns`` before
     the ``URL_PREFIX`` wrapper is applied, so mutating that list keeps routes
     consistent when a path prefix is configured.
     """

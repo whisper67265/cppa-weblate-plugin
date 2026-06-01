@@ -2,7 +2,7 @@
 #
 # SPDX-License-Identifier: BSL-1.0
 
-"""HTTP helper for integration tests — stdlib only (no requests/httpx)."""
+"""HTTP helper for plugin tests — stdlib only (no requests/httpx)."""
 
 from __future__ import annotations
 

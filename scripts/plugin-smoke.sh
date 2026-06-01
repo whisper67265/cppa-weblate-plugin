@@ -2,7 +2,7 @@
 # SPDX-FileCopyrightText: 2026 Andrew Zhang <whisper67265@outlook.com>
 # SPDX-License-Identifier: BSL-1.0
 
-# Integration smoke test entrypoint.
+# Plugin smoke test entrypoint.
 # Builds the stack, waits for health, creates a token, runs smoke tests.
 # On exit (success or failure): collects logs and tears down the stack.
 

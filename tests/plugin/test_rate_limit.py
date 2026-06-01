@@ -2,7 +2,7 @@
 #
 # SPDX-License-Identifier: BSL-1.0
 
-"""Integration tests for Boost endpoint rate limiting."""
+"""Plugin tests for Boost endpoint rate limiting."""
 
 from __future__ import annotations
 

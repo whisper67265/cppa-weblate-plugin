@@ -2,7 +2,7 @@
 # SPDX-FileCopyrightText: 2026 Andrew Zhang <whisper67265@outlook.com>
 # SPDX-License-Identifier: BSL-1.0
 
-# Integration functional test entrypoint (P1).
+# Plugin functional test entrypoint (P1).
 # Builds the stack, waits for health, creates API token, extracts SSH pubkey,
 # runs functional tests against a live Weblate instance.
 

@@ -32,8 +32,8 @@ jobs:
       with:
         version: 0.11.12
 
-    - name: Run integration smoke tests
-      run: bash scripts/integration-smoke.sh
+    - name: Run plugin smoke tests
+      run: bash scripts/plugin-smoke.sh
 
     - name: Upload logs on failure
       if: failure()

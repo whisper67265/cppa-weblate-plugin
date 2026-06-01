@@ -2,7 +2,7 @@
 #
 # SPDX-License-Identifier: BSL-1.0
 
-"""P0 integration smoke tests.
+"""P0 plugin smoke tests.
 
 Verifies:
 - Container boots with plugin installed (no import errors, no AppRegistryNotReady)

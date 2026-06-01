@@ -72,7 +72,7 @@ cppa-weblate-plugin/
 |-------------|----------|
 | Test coverage | ≥ 90 % (enforced by `--cov-fail-under=90`) |
 | CI | GitHub Actions: `pytest`, `ruff check`, coverage gate on every PR |
-| Integration test | CI job: `uv pip install weblate "git+https://…/cppa-weblate-plugin@HEAD"` in a Docker-compose stack → smoke-test endpoint + format registration |
+| Plugin test | CI job: `uv pip install weblate "git+https://…/cppa-weblate-plugin@HEAD"` in a Docker-compose stack → smoke-test endpoint + format registration |
 | CD | CD workflow clones **upstream** `weblate-docker`, edits its `Dockerfile` (install upstream Weblate from PyPI + plugin from `git+https://…/cppa-weblate-plugin@<tag>`, `COPY` `settings-override.py` into the image). `settings-override.py` is versioned in **this** repo. `WEBLATE_ADD_APPS` adds `boost_weblate.endpoint` to `INSTALLED_APPS`; `WEBLATE_FORMATS +=` registers the QuickBook format class. |
 | LICENSE | GPL-3.0-or-later in repo root (same license family as Weblate) |
 | Runtime deps | All deps declared in `pyproject.toml`; no implicit system deps without docs |
@@ -108,7 +108,7 @@ Weblate's `urls.py` does **not** auto-discover URL patterns from `INSTALLED_APPS
 - `AppConfig.ready()` — programmatically append to `urlpatterns` at startup (simplest for a self-contained plugin), **or**
 - `ROOT_URLCONF` override in `settings-override.py` — point to a custom URL conf that imports Weblate's patterns and adds the plugin's `include()`.
 
-**Action:** prototype both approaches in the integration test environment and pick the one that survives Weblate upgrades best. Document the chosen approach in `README.md` so Week 2 implementation can proceed without ambiguity.
+**Action:** prototype both approaches in the plugin test environment and pick the one that survives Weblate upgrades best. Document the chosen approach in `README.md` so Week 2 implementation can proceed without ambiguity.
 
 ---
 
@@ -136,7 +136,7 @@ The `AppConfig`, URL config, and settings registration skeletons are in [Appendi
 
 **Weekly outcome:** **`integration.yml`** is fully working (no partial phases); **`docs/deployment-runbook.md`** written once to match the live CD path; CD script and release tag; fork retired.
 
-## Integration CI — complete in this week
+## Plugin CI — complete in this week
 
 - Replace the **`integration.yml`** placeholder with a finished workflow: Docker Compose stack, `uv pip install weblate "git+https://…/cppa-weblate-plugin@HEAD"`, smoke-test format registration and `/boost-endpoint/`.
 
@@ -166,8 +166,8 @@ The standalone plugin approach is the only alternative that satisfies all six cr
 
 | ID | Risk | Likelihood | Impact | Mitigation |
 |----|------|-----------|--------|------------|
-| R1 | `BaseFormat` ABC changes between Weblate releases, breaking `QuickBookFormat` | Low — it is the public extension API | High | Pin Weblate version in `pyproject.toml`; integration CI installs both packages on every PR; bumping the pin is a deliberate, tested action |
-| R2 | Weblate removes or renames `WEBLATE_FORMATS` / `WEBLATE_ADD_APPS` Docker env vars | Very low — these are documented deployment knobs | High | Same pin + integration CI; if removed, `settings-override.py` `COPY` path is a fallback requiring only a `Dockerfile` edit |
+| R1 | `BaseFormat` ABC changes between Weblate releases, breaking `QuickBookFormat` | Low — it is the public extension API | High | Pin Weblate version in `pyproject.toml`; plugin CI installs both packages on every PR; bumping the pin is a deliberate, tested action |
+| R2 | Weblate removes or renames `WEBLATE_FORMATS` / `WEBLATE_ADD_APPS` Docker env vars | Very low — these are documented deployment knobs | High | Same pin + plugin CI; if removed, `settings-override.py` `COPY` path is a fallback requiring only a `Dockerfile` edit |
 | R3 | Django major-version upgrade inside Weblate breaks `boost_endpoint` views/serializers | Low — Django REST patterns are stable across majors | Medium | Standard Django upgrade path applies; no Weblate-internal Django usage in the plugin |
 | R4 | `git+https://…@<tag>` install fails in air-gapped or restricted network environments | Medium — depends on deployment environment | Medium | Mirror the plugin package to an internal PyPI index if required; the install mechanism is standard pip and switchable |
 | R5 | Scope creep requiring Weblate internal API access (e.g. signals, celery tasks) | Low given current requirements | High | Any new requirement that cannot be satisfied via documented extension points is a no-go trigger |

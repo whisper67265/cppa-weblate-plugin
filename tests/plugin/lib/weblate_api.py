@@ -2,7 +2,7 @@
 #
 # SPDX-License-Identifier: BSL-1.0
 
-"""Weblate REST API client for integration tests (stdlib only)."""
+"""Weblate REST API client for plugin tests (stdlib only)."""
 
 from __future__ import annotations
 

@@ -2,7 +2,7 @@
 #
 # SPDX-License-Identifier: BSL-1.0
 
-"""Ephemeral GitHub repository lifecycle for integration tests (stdlib only)."""
+"""Ephemeral GitHub repository lifecycle for plugin tests (stdlib only)."""
 
 from __future__ import annotations
 
@@ -23,7 +23,7 @@ def _api_error_message(method: str, path: str, code: int, raw: bytes) -> str:
 
 
 class EphemeralGitHubRepo:
-    """Create, populate, and destroy a temporary GitHub repo for integration tests."""
+    """Create, populate, and destroy a temporary GitHub repo for plugin tests."""
 
     __test__ = False  # not a pytest test class
 
@@ -161,7 +161,7 @@ class EphemeralGitHubRepo:
                 dest,
                 src.read_bytes(),
                 branch,
-                message=f"Add {dest} for integration tests",
+                message=f"Add {dest} for plugin tests",
             )
 
     def add_deploy_key(self, public_key: str, title: str = "weblate-ci") -> None:

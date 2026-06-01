@@ -32,8 +32,8 @@ jobs:
       with:
         version: 0.11.12
 
-    - name: Run integration auth tests
-      run: bash scripts/integration-auth.sh
+    - name: Run plugin auth tests
+      run: bash scripts/plugin-auth.sh
 
     - name: Upload logs on failure
       if: failure()

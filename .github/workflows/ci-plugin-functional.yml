@@ -42,10 +42,10 @@ jobs:
       with:
         version: 0.11.12
 
-    - name: Run integration functional tests
+    - name: Run plugin functional tests
       env:
         GH_TEST_REPO_TOKEN: ${{ secrets.GH_TEST_REPO_TOKEN }}
-      run: bash scripts/integration-functional.sh
+      run: bash scripts/plugin-functional.sh
 
     - name: Upload logs on failure
       if: failure()

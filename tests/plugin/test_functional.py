@@ -2,7 +2,7 @@
 #
 # SPDX-License-Identifier: BSL-1.0
 
-"""P1 integration functional tests.
+"""P1 plugin functional tests.
 
 Requires a live Weblate stack (Docker Compose) and optional GH_TEST_REPO_TOKEN
 for add-or-update / BoostComponentService tests.

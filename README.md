@@ -265,9 +265,9 @@ Triggered on push and PR to `main` and `develop`. Calls seven reusable sub-workf
 | `test` | [`.github/workflows/ci-test.yml`](.github/workflows/ci-test.yml) | pytest + 90% coverage gate (`--cov-fail-under=90`) |
 | `package` | [`.github/workflows/ci-package.yml`](.github/workflows/ci-package.yml) | `uv build`, twine, pydistcheck, pyroma, check-wheel-contents, check-manifest |
 | `dependencies` | [`.github/workflows/ci-dependencies.yml`](.github/workflows/ci-dependencies.yml) | pip-audit, liccheck, dependency review (on PRs) |
-| `plugin-smoke` | [`.github/workflows/ci-plugin-smoke.yml`](.github/workflows/ci-plugin-smoke.yml) | Docker stack → P0 smoke tests (`scripts/integration-smoke.sh`) |
-| `plugin-auth` | [`.github/workflows/ci-plugin-auth.yml`](.github/workflows/ci-plugin-auth.yml) | Docker stack → auth tests (`scripts/integration-auth.sh`) |
-| `plugin-functional` | [`.github/workflows/ci-plugin-functional.yml`](.github/workflows/ci-plugin-functional.yml) | Docker stack → E2E functional tests (`scripts/integration-functional.sh`); optional `GH_TEST_REPO_TOKEN` secret for GitHub-backed tests |
+| `plugin-smoke` | [`.github/workflows/ci-plugin-smoke.yml`](.github/workflows/ci-plugin-smoke.yml) | Docker stack → P0 smoke tests (`scripts/plugin-smoke.sh`) |
+| `plugin-auth` | [`.github/workflows/ci-plugin-auth.yml`](.github/workflows/ci-plugin-auth.yml) | Docker stack → auth tests (`scripts/plugin-auth.sh`) |
+| `plugin-functional` | [`.github/workflows/ci-plugin-functional.yml`](.github/workflows/ci-plugin-functional.yml) | Docker stack → E2E functional tests (`scripts/plugin-functional.sh`); optional `GH_TEST_REPO_TOKEN` secret for GitHub-backed tests |
 
 All `ci-plugin-*` jobs build the CI Docker stack (`docker/docker-compose.ci.yml`), wait for the healthcheck, create an API token, run the corresponding pytest suite under `tests/plugin/`, and tear down.
 
@@ -281,15 +281,15 @@ Full deployment procedure: [docs/deployment-runbook.md](docs/deployment-runbook.
 
 ```bash
 # Smoke (P0 — container boot, format registration, URL registration):
-bash scripts/integration-smoke.sh
+bash scripts/plugin-smoke.sh
 
 # Auth (token auth on protected routes; ping stays public):
-bash scripts/integration-auth.sh
+bash scripts/plugin-auth.sh
 
 # Functional (QuickBook round-trip, BoostComponentService E2E, Celery flow):
 # Set GH_TEST_REPO_TOKEN for GitHub-backed tests; unset to skip them.
 export GH_TEST_REPO_TOKEN=ghp_...
-bash scripts/integration-functional.sh
+bash scripts/plugin-functional.sh
 ```
 
 Each script builds `docker/docker-compose.ci.yml`, waits for health, runs its pytest suite, and tears down the stack.
