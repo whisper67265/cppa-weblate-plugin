@@ -94,7 +94,10 @@ def test_weblate_formats_includes_upstream_and_quickbook() -> None:
 
 
 def test_merge_boost_endpoint_throttle_rates_preserves_upstream() -> None:
-    from boost_weblate.settings_override import merge_boost_endpoint_throttle_rates
+    from boost_weblate.settings_override import (
+        BOOST_ENDPOINT_THROTTLE_RATES,
+        merge_boost_endpoint_throttle_rates,
+    )
 
     merged = merge_boost_endpoint_throttle_rates(
         {"DEFAULT_THROTTLE_RATES": {"user": "1/hour", "anon": "100/day"}}
@@ -102,5 +105,5 @@ def test_merge_boost_endpoint_throttle_rates_preserves_upstream() -> None:
     rates = merged["DEFAULT_THROTTLE_RATES"]
     assert rates["user"] == "1/hour"
     assert rates["anon"] == "100/day"
-    assert rates["info"] == "60/minute"
-    assert rates["add-or-update"] == "10/hour"
+    assert rates["info"] == BOOST_ENDPOINT_THROTTLE_RATES["info"]
+    assert rates["add-or-update"] == BOOST_ENDPOINT_THROTTLE_RATES["add-or-update"]

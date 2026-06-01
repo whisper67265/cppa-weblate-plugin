@@ -5,6 +5,7 @@
 from __future__ import annotations
 
 import importlib.metadata
+from contextlib import contextmanager
 from copy import deepcopy
 from unittest.mock import MagicMock
 
@@ -34,17 +35,51 @@ _ADD_OR_UPDATE_BODY = {
 }
 
 
-def _reload_throttle_rates() -> None:
-    api_settings.reload()
-    SimpleRateThrottle.THROTTLE_RATES = api_settings.DEFAULT_THROTTLE_RATES
-
-
 def _throttle_rest_framework(**rate_overrides: str) -> dict:
     rf = deepcopy(settings.REST_FRAMEWORK)
     rates = dict(rf.get("DEFAULT_THROTTLE_RATES", {}))
     rates.update(rate_overrides)
     rf["DEFAULT_THROTTLE_RATES"] = rates
     return rf
+
+
+@contextmanager
+def _isolated_throttle_rates(rest_framework: dict):
+    """Apply REST_FRAMEWORK throttle rates; restore rates and cache after use."""
+    with override_settings(REST_FRAMEWORK=rest_framework):
+        orig = dict(SimpleRateThrottle.THROTTLE_RATES or {})
+        cache.clear()
+        try:
+            api_settings.reload()
+            SimpleRateThrottle.THROTTLE_RATES = dict(
+                api_settings.DEFAULT_THROTTLE_RATES or {}
+            )
+            yield
+        finally:
+            cache.clear()
+            SimpleRateThrottle.THROTTLE_RATES = orig
+            api_settings.reload()
+
+
+@pytest.fixture
+def scoped_low_throttle_rates():
+    rest_framework = _throttle_rest_framework(
+        user="10000/hour",
+        info="2/minute",
+        **{"add-or-update": "2/minute"},
+    )
+    with _isolated_throttle_rates(rest_framework):
+        yield
+
+
+@pytest.fixture
+def user_low_throttle_rates():
+    rest_framework = _throttle_rest_framework(
+        user="2/minute",
+        info="10000/minute",
+    )
+    with _isolated_throttle_rates(rest_framework):
+        yield
 
 
 @pytest.fixture
@@ -231,17 +266,9 @@ def test_boost_add_or_update_task_propagates_service_errors(
         )
 
 
-@override_settings(
-    REST_FRAMEWORK=_throttle_rest_framework(
-        user="10000/hour",
-        info="2/minute",
-        **{"add-or-update": "2/minute"},
-    )
-)
-def test_boost_endpoint_info_returns_429_when_scoped_throttled() -> None:
-    cache.clear()
-    _reload_throttle_rates()
-
+def test_boost_endpoint_info_returns_429_when_scoped_throttled(
+    scoped_low_throttle_rates,
+) -> None:
     factory = APIRequestFactory()
     user = User(username="t_throttle_info", pk=101)
     view = BoostEndpointInfo.as_view()
@@ -260,19 +287,10 @@ def test_boost_endpoint_info_returns_429_when_scoped_throttled() -> None:
     assert int(response["Retry-After"]) > 0
 
 
-@override_settings(
-    REST_FRAMEWORK=_throttle_rest_framework(
-        user="10000/hour",
-        info="2/minute",
-        **{"add-or-update": "2/minute"},
-    )
-)
 def test_add_or_update_returns_429_when_scoped_throttled(
+    scoped_low_throttle_rates,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    cache.clear()
-    _reload_throttle_rates()
-
     delay_mock = MagicMock(return_value=MagicMock(id="task-uuid"))
     monkeypatch.setattr(
         "boost_weblate.endpoint.views.boost_add_or_update_task.delay",
@@ -298,13 +316,9 @@ def test_add_or_update_returns_429_when_scoped_throttled(
     assert delay_mock.call_count == 2
 
 
-@override_settings(
-    REST_FRAMEWORK=_throttle_rest_framework(user="2/minute", info="10000/minute")
-)
-def test_boost_endpoint_info_user_throttle_can_429() -> None:
-    cache.clear()
-    _reload_throttle_rates()
-
+def test_boost_endpoint_info_user_throttle_can_429(
+    user_low_throttle_rates,
+) -> None:
     factory = APIRequestFactory()
     user = User(username="t_user_throttle", pk=103)
     view = BoostEndpointInfo.as_view()
