@@ -23,10 +23,10 @@ jobs:
     uses: ./.github/workflows/ci-package.yml
   dependencies:
     uses: ./.github/workflows/ci-dependencies.yml
-  combination-smoke:
-    uses: ./.github/workflows/ci-combination-smoke.yml
-  combination-functional:
-    uses: ./.github/workflows/ci-combination-functional.yml
+  plugin-smoke:
+    uses: ./.github/workflows/ci-plugin-smoke.yml
+  plugin-functional:
+    uses: ./.github/workflows/ci-plugin-functional.yml
     secrets: inherit
-  combination-auth:
-    uses: ./.github/workflows/ci-combination-auth.yml
+  plugin-auth:
+    uses: ./.github/workflows/ci-plugin-auth.yml

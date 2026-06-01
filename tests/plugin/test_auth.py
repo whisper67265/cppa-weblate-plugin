@@ -15,9 +15,9 @@ from __future__ import annotations
 
 import pytest
 
-from tests.integration.lib.http import http_get, http_json
+from tests.plugin.lib.http import http_get, http_json
 
-pytestmark = pytest.mark.integration
+pytestmark = pytest.mark.plugin
 
 _VALID_ADD_OR_UPDATE_BODY = {
     "organization": "test-org",

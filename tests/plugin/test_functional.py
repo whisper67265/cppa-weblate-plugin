@@ -15,17 +15,17 @@ from dataclasses import dataclass
 
 import pytest
 
-from tests.integration.conftest import (
+from tests.plugin.conftest import (
     FIXTURES_DIR,
     TEST_BRANCH,
     TEST_LANG_CODE,
     TEST_VERSION,
 )
-from tests.integration.lib.gh_repo import EphemeralGitHubRepo
-from tests.integration.lib.http import http_json
-from tests.integration.lib.weblate_api import WeblateAPI
+from tests.plugin.lib.gh_repo import EphemeralGitHubRepo
+from tests.plugin.lib.http import http_json
+from tests.plugin.lib.weblate_api import WeblateAPI
 
-pytestmark = pytest.mark.integration
+pytestmark = pytest.mark.plugin
 
 QBK_FIXTURE = FIXTURES_DIR / "quickbook_fixture.qbk"
 KNOWN_SOURCE_STRING = "Complex QuickBook test fixture"

@@ -708,13 +708,13 @@ dev = [
   {name = "coverage"},
   {name = "pytest-cov"}
 ]
-integration = [
-  {name = "pytest"},
-  {name = "pytest-timeout"}
-]
 lint = [
   {name = "prek"},
   {name = "pytest"}
+]
+plugin = [
+  {name = "pytest"},
+  {name = "pytest-timeout"}
 ]
 pre-commit = [
   {name = "prek"},
@@ -740,13 +740,13 @@ dev = [
   {name = "coverage", extras = ["toml"], specifier = ">=7.6.0"},
   {name = "pytest-cov", specifier = ">=7.1.0"}
 ]
-integration = [
-  {name = "pytest", specifier = ">=8.3"},
-  {name = "pytest-timeout", specifier = ">=2.3.1"}
-]
 lint = [
   {name = "prek", specifier = "==0.3.13"},
   {name = "pytest", specifier = ">=8.3"}
+]
+plugin = [
+  {name = "pytest", specifier = ">=8.3"},
+  {name = "pytest-timeout", specifier = ">=2.3.1"}
 ]
 pre-commit = [
   {name = "prek", specifier = "==0.3.13"},

@@ -91,7 +91,7 @@ flowchart TB
 
 - **`src/boost_weblate/endpoint/`** — **HTTP API** for Boost documentation project/component management. Exposes three routes under `/boost-endpoint/` (see [Boost endpoint routes](#boost-endpoint-routes)), uses Django REST Framework for auth and serialization, and hands off heavy work to a Celery task (see [Celery requirement for add-or-update](#celery-requirement-for-add-or-update)).
 
-- **`tests/`** — **Pytest** layout mirrors `src/boost_weblate/` (`tests/formats/`, `tests/utils/`, `tests/endpoint/`). Shared fixtures live under `tests/fixtures/`. `tests/conftest.py` configures `sys.path`, sets `DJANGO_SETTINGS_MODULE` to `tests.django_qbk_format_settings`, and calls `django.setup()` so format tests can load Weblate's Django stack without requiring PostgreSQL. Docker-based integration tests live in `tests/integration/`.
+- **`tests/`** — **Pytest** layout mirrors `src/boost_weblate/` (`tests/formats/`, `tests/utils/`, `tests/endpoint/`). Shared fixtures live under `tests/fixtures/`. `tests/conftest.py` configures `sys.path`, sets `DJANGO_SETTINGS_MODULE` to `tests.django_qbk_format_settings`, and calls `django.setup()` so format tests can load Weblate's Django stack without requiring PostgreSQL. Docker-based plugin tests live in `tests/plugin/`.
 
 ## WEBLATE_FORMATS configuration
 
@@ -265,11 +265,11 @@ Triggered on push and PR to `main` and `develop`. Calls seven reusable sub-workf
 | `test` | [`.github/workflows/ci-test.yml`](.github/workflows/ci-test.yml) | pytest + 90% coverage gate (`--cov-fail-under=90`) |
 | `package` | [`.github/workflows/ci-package.yml`](.github/workflows/ci-package.yml) | `uv build`, twine, pydistcheck, pyroma, check-wheel-contents, check-manifest |
 | `dependencies` | [`.github/workflows/ci-dependencies.yml`](.github/workflows/ci-dependencies.yml) | pip-audit, liccheck, dependency review (on PRs) |
-| `combination-smoke` | [`.github/workflows/ci-combination-smoke.yml`](.github/workflows/ci-combination-smoke.yml) | Docker stack → P0 smoke tests (`scripts/integration-smoke.sh`) |
-| `combination-auth` | [`.github/workflows/ci-combination-auth.yml`](.github/workflows/ci-combination-auth.yml) | Docker stack → auth tests (`scripts/integration-auth.sh`) |
-| `combination-functional` | [`.github/workflows/ci-combination-functional.yml`](.github/workflows/ci-combination-functional.yml) | Docker stack → E2E functional tests (`scripts/integration-functional.sh`); optional `GH_TEST_REPO_TOKEN` secret for GitHub-backed tests |
+| `plugin-smoke` | [`.github/workflows/ci-plugin-smoke.yml`](.github/workflows/ci-plugin-smoke.yml) | Docker stack → P0 smoke tests (`scripts/integration-smoke.sh`) |
+| `plugin-auth` | [`.github/workflows/ci-plugin-auth.yml`](.github/workflows/ci-plugin-auth.yml) | Docker stack → auth tests (`scripts/integration-auth.sh`) |
+| `plugin-functional` | [`.github/workflows/ci-plugin-functional.yml`](.github/workflows/ci-plugin-functional.yml) | Docker stack → E2E functional tests (`scripts/integration-functional.sh`); optional `GH_TEST_REPO_TOKEN` secret for GitHub-backed tests |
 
-All `ci-combination-*` jobs build the CI Docker stack (`docker/docker-compose.ci.yml`), wait for the healthcheck, create an API token, run the corresponding pytest suite under `tests/integration/`, and tear down.
+All `ci-plugin-*` jobs build the CI Docker stack (`docker/docker-compose.ci.yml`), wait for the healthcheck, create an API token, run the corresponding pytest suite under `tests/plugin/`, and tear down.
 
 ### CD (`cd.yml`)
 
@@ -277,7 +277,7 @@ Triggered after CI succeeds on a `develop` push. SSHes into the staging server a
 
 Full deployment procedure: [docs/deployment-runbook.md](docs/deployment-runbook.md).
 
-### Running integration tests locally
+### Running plugin tests locally
 
 ```bash
 # Smoke (P0 — container boot, format registration, URL registration):

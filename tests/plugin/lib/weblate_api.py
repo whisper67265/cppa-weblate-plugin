@@ -17,7 +17,7 @@ from urllib.error import HTTPError
 from urllib.parse import urlparse
 from urllib.request import Request, urlopen
 
-from tests.integration.lib.http import auth_header, base_url, http_json
+from tests.plugin.lib.http import auth_header, base_url, http_json
 
 # Weblate blocks localhost/loopback in project.web (SSRF protection).
 _DEFAULT_PROJECT_WEB = "https://example.com/"
@@ -513,7 +513,7 @@ class WeblateAPI:
         interval: float = 3.0,
     ) -> Any:
         """Poll Celery task result inside the Weblate container."""
-        from tests.integration.lib.docker_exec import docker_exec_python
+        from tests.plugin.lib.docker_exec import docker_exec_python
 
         deadline = time.monotonic() + timeout
         snippet_template = """

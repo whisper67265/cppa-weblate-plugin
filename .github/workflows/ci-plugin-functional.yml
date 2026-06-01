@@ -2,16 +2,16 @@
 #
 # SPDX-License-Identifier: BSL-1.0
 
-name: Combination functional
+name: Plugin functional
 
 on:
   workflow_call:
     secrets:
       # GitHub classic PAT with `repo` scope (repository secret, not a variable).
-      # Used by tests/integration/lib/gh_repo.py to create a temporary repo,
+      # Used by tests/plugin/lib/gh_repo.py to create a temporary repo,
       # push QuickBook fixtures, register Weblate's SSH deploy key, and delete
       # the repo after the run. Enables add-or-update / BoostComponentService E2E
-      # in tests/integration/test_functional.py. If unset, those tests are skipped
+      # in tests/plugin/test_functional.py. If unset, those tests are skipped
       # (smoke round-trip and other non-GitHub tests still run). Inherited from
       # the caller via secrets: inherit in ci.yml.
       GH_TEST_REPO_TOKEN:
@@ -22,8 +22,8 @@ permissions:
   contents: read
 
 jobs:
-  combination-functional:
-    name: Combination functional
+  plugin-functional:
+    name: Plugin functional
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
@@ -52,5 +52,5 @@ jobs:
       # actions/upload-artifact v4.6.2
       uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
       with:
-        name: ci-combination-functional-logs
+        name: ci-plugin-functional-logs
         path: /tmp/compose-logs.txt

@@ -42,6 +42,6 @@ export BOOST_ENDPOINT_THROTTLE_INFO="${BOOST_ENDPOINT_THROTTLE_INFO:-3/minute}"
 export BOOST_ENDPOINT_THROTTLE_ADD_OR_UPDATE="${BOOST_ENDPOINT_THROTTLE_ADD_OR_UPDATE:-3/hour}"
 
 echo "=== Running auth tests ==="
-uv pip install --quiet --system --group integration
-python -m pytest --confcutdir=tests/integration --override-ini addopts= \
-    tests/integration/test_auth.py tests/integration/test_rate_limit.py -v
+uv pip install --quiet --system --group plugin
+python -m pytest --confcutdir=tests/plugin --override-ini addopts= \
+    tests/plugin/test_auth.py tests/plugin/test_rate_limit.py -v

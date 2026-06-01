@@ -2,7 +2,7 @@
 #
 # SPDX-License-Identifier: BSL-1.0
 
-"""Shared fixtures for integration tests (smoke + functional)."""
+"""Shared fixtures for plugin tests (smoke + functional)."""
 
 from __future__ import annotations
 
@@ -12,10 +12,10 @@ from pathlib import Path
 
 import pytest
 
-from tests.integration.lib.docker_exec import docker_exec_python, docker_exec_read_file
-from tests.integration.lib.gh_repo import EphemeralGitHubRepo, default_repo_name
-from tests.integration.lib.http import base_url
-from tests.integration.lib.weblate_api import WeblateAPI
+from tests.plugin.lib.docker_exec import docker_exec_python, docker_exec_read_file
+from tests.plugin.lib.gh_repo import EphemeralGitHubRepo, default_repo_name
+from tests.plugin.lib.http import base_url
+from tests.plugin.lib.weblate_api import WeblateAPI
 
 FIXTURES_DIR = Path(__file__).resolve().parent.parent / "fixtures"
 TEST_LANG_CODE = "zh_Hans"

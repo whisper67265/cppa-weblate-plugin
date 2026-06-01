@@ -2,4 +2,4 @@
 #
 # SPDX-License-Identifier: BSL-1.0
 
-"""Shared helpers for integration tests."""
+"""Shared helpers for plugin tests."""

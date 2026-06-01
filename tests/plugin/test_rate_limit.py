@@ -11,9 +11,9 @@ import re
 
 import pytest
 
-from tests.integration.lib.http import http_get_with_headers, http_json_with_headers
+from tests.plugin.lib.http import http_get_with_headers, http_json_with_headers
 
-pytestmark = pytest.mark.integration
+pytestmark = pytest.mark.plugin
 
 _VALID_ADD_OR_UPDATE_BODY = {
     "organization": "test-org",

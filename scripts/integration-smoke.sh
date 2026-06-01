@@ -42,6 +42,6 @@ export WEBLATE_COMPOSE_PROJECT="${COMPOSE_PROJECT_NAME}"
 echo "=== Running smoke tests ==="
 # Same pytest floor as dev/pre-commit (pyproject.toml); not pinned to uv.lock.
 # --system: setup-python on CI has no project venv (matches ci-dependencies.yml).
-uv pip install --quiet --system --group integration
-# Do not load tests/conftest.py (Django host setup); integration tests only need pytest + stdlib.
-python -m pytest --confcutdir=tests/integration --override-ini addopts= tests/integration/test_smoke.py -v
+uv pip install --quiet --system --group plugin
+# Do not load tests/conftest.py (Django host setup); plugin tests only need pytest + stdlib.
+python -m pytest --confcutdir=tests/plugin --override-ini addopts= tests/plugin/test_smoke.py -v

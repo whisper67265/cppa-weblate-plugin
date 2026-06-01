@@ -18,11 +18,11 @@ GitHub Actions and CI/CD helpers for this repository.
 | [`workflows/ci-test.yml`](workflows/ci-test.yml) | Unit tests and coverage |
 | [`workflows/ci-package.yml`](workflows/ci-package.yml) | Build and package checks |
 | [`workflows/ci-dependencies.yml`](workflows/ci-dependencies.yml) | Dependency and license audit |
-| [`workflows/ci-combination-smoke.yml`](workflows/ci-combination-smoke.yml) | Integration smoke (Docker stack) |
-| [`workflows/ci-combination-functional.yml`](workflows/ci-combination-functional.yml) | Integration functional tests |
-| [`workflows/ci-combination-auth.yml`](workflows/ci-combination-auth.yml) | Integration auth tests |
+| [`workflows/ci-plugin-smoke.yml`](workflows/ci-plugin-smoke.yml) | Integration smoke (Docker stack) |
+| [`workflows/ci-plugin-functional.yml`](workflows/ci-plugin-functional.yml) | Integration functional tests |
+| [`workflows/ci-plugin-auth.yml`](workflows/ci-plugin-auth.yml) | Integration auth tests |
 
-Callable workflows (`ci-*`, `ci-combination-*`) are triggered only via `workflow_call` from `ci.yml`, not directly on push.
+Callable workflows (`ci-*`, `ci-plugin-*`) are triggered only via `workflow_call` from `ci.yml`, not directly on push.
 
 ## Other paths
 

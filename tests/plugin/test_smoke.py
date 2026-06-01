@@ -18,9 +18,9 @@ from collections.abc import Callable
 
 import pytest
 
-from tests.integration.lib.http import http_get
+from tests.plugin.lib.http import http_get
 
-pytestmark = pytest.mark.integration
+pytestmark = pytest.mark.plugin
 
 # ---------------------------------------------------------------------------
 # P0: Container boot + plugin load

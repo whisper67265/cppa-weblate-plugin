@@ -58,6 +58,6 @@ else
 fi
 
 echo "=== Running functional tests ==="
-uv pip install --quiet --system --group integration
-python -m pytest --confcutdir=tests/integration --override-ini addopts= \
-    tests/integration/test_functional.py -v --timeout=300
+uv pip install --quiet --system --group plugin
+python -m pytest --confcutdir=tests/plugin --override-ini addopts= \
+    tests/plugin/test_functional.py -v --timeout=300
