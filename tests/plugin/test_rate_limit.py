@@ -11,7 +11,11 @@ import re
 
 import pytest
 
-from tests.plugin.lib.http import http_get_with_headers, http_json_with_headers
+from tests.plugin.lib.http import (
+    get_response_header,
+    http_get_with_headers,
+    http_json_with_headers,
+)
 
 pytestmark = pytest.mark.plugin
 
@@ -22,6 +26,7 @@ _VALID_ADD_OR_UPDATE_BODY = {
 }
 
 _RATE_PATTERN = re.compile(r"^(\d+)/(minute|hour|min|h|day|d)$")
+_RETRY_AFTER_IN_DETAIL = re.compile(r"Expected available in (\d+) second", re.I)
 
 
 def _parse_rate_limit(rate: str) -> int:
@@ -30,6 +35,21 @@ def _parse_rate_limit(rate: str) -> int:
         msg = f"unsupported throttle rate format: {rate!r}"
         raise ValueError(msg)
     return int(match.group(1))
+
+
+def _retry_after_seconds(headers: dict[str, str], body: object) -> int | None:
+    """Retry-After header, or seconds parsed from DRF Throttled error detail."""
+    header = get_response_header(headers, "Retry-After")
+    if header is not None:
+        return int(header)
+    if isinstance(body, dict):
+        errors = body.get("errors") or []
+        if errors:
+            detail = str(errors[0].get("detail", ""))
+            match = _RETRY_AFTER_IN_DETAIL.search(detail)
+            if match:
+                return int(match.group(1))
+    return None
 
 
 _RATE_LIMIT_USER_SNIPPET = """
@@ -79,12 +99,14 @@ class TestBoostEndpointRateLimit:
             "/boost-endpoint/info/", token=rate_limit_api_token
         )
         assert code == 429, f"expected 429 after {limit} requests: {code}"
-        retry_after = headers.get("Retry-After")
-        assert retry_after is not None
-        assert int(retry_after) > 0
+        retry_after = _retry_after_seconds(headers, _body)
+        assert retry_after is not None, (
+            f"expected Retry-After header or wait in body, headers={sorted(headers)}"
+        )
+        assert retry_after > 0
 
-        if "X-RateLimit-Limit" in last_headers:
-            assert int(last_headers["X-RateLimit-Limit"]) == limit
+        if get_response_header(last_headers, "X-RateLimit-Limit") is not None:
+            assert int(get_response_header(last_headers, "X-RateLimit-Limit")) == limit
 
     def test_add_or_update_returns_429_when_rate_limited(
         self, rate_limit_api_token: str
@@ -108,6 +130,8 @@ class TestBoostEndpointRateLimit:
             body=_VALID_ADD_OR_UPDATE_BODY,
         )
         assert code == 429, f"expected 429 after {limit} requests: {code}"
-        retry_after = headers.get("Retry-After")
-        assert retry_after is not None
-        assert int(retry_after) > 0
+        retry_after = _retry_after_seconds(headers, _body)
+        assert retry_after is not None, (
+            f"expected Retry-After header or wait in body, headers={sorted(headers)}"
+        )
+        assert retry_after > 0

@@ -23,7 +23,15 @@ def auth_header(token: str) -> str:
 
 
 def _response_headers(header_obj) -> dict[str, str]:
-    return {k: v for k, v in header_obj.items()}
+    """Normalize header names to lowercase for case-insensitive lookup."""
+    if header_obj is None:
+        return {}
+    return {k.lower(): v for k, v in header_obj.items()}
+
+
+def get_response_header(headers: dict[str, str], name: str) -> str | None:
+    """Return a response header value (case-insensitive)."""
+    return headers.get(name.lower())
 
 
 def http_json_with_headers(
