@@ -38,8 +38,10 @@ export WEBLATE_API_TOKEN
 export WEBLATE_LIVE_BASE_URL="${WEBLATE_LIVE_BASE_URL:-http://localhost:${WEBLATE_PORT:-8080}}"
 export WEBLATE_COMPOSE_FILE="${COMPOSE_FILE}"
 export WEBLATE_COMPOSE_PROJECT="${COMPOSE_PROJECT_NAME}"
+export BOOST_ENDPOINT_THROTTLE_INFO="${BOOST_ENDPOINT_THROTTLE_INFO:-3/minute}"
+export BOOST_ENDPOINT_THROTTLE_ADD_OR_UPDATE="${BOOST_ENDPOINT_THROTTLE_ADD_OR_UPDATE:-3/hour}"
 
 echo "=== Running auth tests ==="
 uv pip install --quiet --system --group integration
 python -m pytest --confcutdir=tests/integration --override-ini addopts= \
-    tests/integration/test_auth.py -v
+    tests/integration/test_auth.py tests/integration/test_rate_limit.py -v

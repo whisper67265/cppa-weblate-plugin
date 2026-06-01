@@ -22,6 +22,49 @@ def auth_header(token: str) -> str:
     return f"Token {token}"
 
 
+def _response_headers(header_obj) -> dict[str, str]:
+    return {k: v for k, v in header_obj.items()}
+
+
+def http_json_with_headers(
+    method: str,
+    path: str,
+    *,
+    token: str | None = None,
+    body: dict[str, Any] | None = None,
+    timeout: float = 30.0,
+) -> tuple[int, Any, dict[str, str]]:
+    """Perform an HTTP request and return ``(status_code, body, response_headers)``."""
+    url = f"{base_url()}{path}"
+    headers: dict[str, str] = {"Accept": "application/json"}
+    if token is not None:
+        headers["Authorization"] = auth_header(token)
+
+    data: bytes | None = None
+    if body is not None:
+        data = json.dumps(body).encode()
+        headers["Content-Type"] = "application/json"
+
+    req = urllib.request.Request(url, data=data, headers=headers, method=method)
+    resp_headers: dict[str, str] = {}
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            raw = resp.read()
+            code: int = resp.getcode()
+            resp_headers = _response_headers(resp.headers)
+    except urllib.error.HTTPError as e:
+        raw = e.read()
+        code = e.code
+        resp_headers = _response_headers(e.headers)
+
+    if not raw:
+        return code, None, resp_headers
+    try:
+        return code, json.loads(raw.decode()), resp_headers
+    except (json.JSONDecodeError, UnicodeDecodeError):
+        return code, raw.decode(errors="replace"), resp_headers
+
+
 def http_json(
     method: str,
     path: str,
@@ -62,3 +105,9 @@ def http_get(
     path: str, *, token: str | None = None, timeout: float = 30.0
 ) -> tuple[int, Any]:
     return http_json("GET", path, token=token, timeout=timeout)
+
+
+def http_get_with_headers(
+    path: str, *, token: str | None = None, timeout: float = 30.0
+) -> tuple[int, Any, dict[str, str]]:
+    return http_json_with_headers("GET", path, token=token, timeout=timeout)

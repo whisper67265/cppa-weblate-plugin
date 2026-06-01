@@ -23,6 +23,8 @@ import tempfile
 
 import weblate.settings_example as _wl_example
 
+from boost_weblate.settings_override import merge_boost_endpoint_throttle_rates
+
 for _key, _value in _wl_example.__dict__.items():
     if _key.isupper():
         globals()[_key] = _value
@@ -59,3 +61,5 @@ CACHES = {"default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"
 PASSWORD_HASHERS = [
     "django.contrib.auth.hashers.MD5PasswordHasher",
 ]
+
+REST_FRAMEWORK = merge_boost_endpoint_throttle_rates(_wl_example.REST_FRAMEWORK)

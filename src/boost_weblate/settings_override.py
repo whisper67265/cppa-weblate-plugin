@@ -28,8 +28,10 @@ back to ``globals()["INSTALLED_APPS"]``. Importing this module without
 
 from __future__ import annotations
 
+import os
 import re
 from pathlib import Path
+from typing import Any
 
 # Package ``__init__`` is empty; does not import ``formats.models``.
 import weblate.formats
@@ -68,6 +70,44 @@ def weblate_formats_with_quickbook() -> tuple[str, ...]:
 
 
 WEBLATE_FORMATS = weblate_formats_with_quickbook()
+
+_DEFAULT_BOOST_ENDPOINT_THROTTLE_RATES = {
+    "info": "60/minute",
+    "add-or-update": "10/hour",
+}
+
+
+def boost_endpoint_throttle_rates() -> dict[str, str]:
+    """Scoped throttle rates for Boost endpoint views (env overrides optional)."""
+    return {
+        "info": os.environ.get(
+            "BOOST_ENDPOINT_THROTTLE_INFO",
+            _DEFAULT_BOOST_ENDPOINT_THROTTLE_RATES["info"],
+        ),
+        "add-or-update": os.environ.get(
+            "BOOST_ENDPOINT_THROTTLE_ADD_OR_UPDATE",
+            _DEFAULT_BOOST_ENDPOINT_THROTTLE_RATES["add-or-update"],
+        ),
+    }
+
+
+BOOST_ENDPOINT_THROTTLE_RATES = boost_endpoint_throttle_rates()
+
+
+def merge_boost_endpoint_throttle_rates(
+    rest_framework: dict[str, Any],
+) -> dict[str, Any]:
+    """Merge Boost endpoint scoped rates into ``REST_FRAMEWORK``."""
+    merged = dict(rest_framework)
+    existing = dict(merged.get("DEFAULT_THROTTLE_RATES", {}))
+    existing.update(BOOST_ENDPOINT_THROTTLE_RATES)
+    merged["DEFAULT_THROTTLE_RATES"] = existing
+    return merged
+
+
+_REST_FRAMEWORK = globals().get("REST_FRAMEWORK")
+if _REST_FRAMEWORK is not None:
+    globals()["REST_FRAMEWORK"] = merge_boost_endpoint_throttle_rates(_REST_FRAMEWORK)
 
 _INSTALLED_APPS = globals().get("INSTALLED_APPS")
 if _INSTALLED_APPS is not None:

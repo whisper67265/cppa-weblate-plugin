@@ -11,7 +11,9 @@ from django.views.decorators.http import require_GET
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
+from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
+from weblate.api.throttling import UserRateThrottle, patch_throttle_request
 
 from boost_weblate.endpoint.serializers import AddOrUpdateRequestSerializer
 from boost_weblate.endpoint.tasks import boost_add_or_update_task
@@ -35,10 +37,24 @@ def plugin_ping(_request):
     return HttpResponse("ok", content_type="text/plain")
 
 
+class BoostEndpointInfoThrottle(ScopedRateThrottle):
+    @patch_throttle_request
+    def allow_request(self, request, view):
+        return super().allow_request(request, view)
+
+
+class AddOrUpdateThrottle(ScopedRateThrottle):
+    @patch_throttle_request
+    def allow_request(self, request, view):
+        return super().allow_request(request, view)
+
+
 class BoostEndpointInfo(APIView):
     """Boost documentation translation API info."""
 
     permission_classes = (IsAuthenticated,)
+    throttle_scope = "info"
+    throttle_classes = (UserRateThrottle, BoostEndpointInfoThrottle)
 
     def get(self, request, format=None):  # noqa: A002
         """Return module name, version, and supported capabilities."""
@@ -55,6 +71,8 @@ class AddOrUpdateView(APIView):
     """Add or update Boost documentation components."""
 
     permission_classes = (IsAuthenticated,)
+    throttle_scope = "add-or-update"
+    throttle_classes = (UserRateThrottle, AddOrUpdateThrottle)
 
     def post(self, request, format=None):  # noqa: A002
         """

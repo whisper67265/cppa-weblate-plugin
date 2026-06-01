@@ -52,6 +52,8 @@ services:
       REDIS_HOST: redis
       REDIS_PORT: '6379'
       CELERY_SINGLE_PROCESS: '1'
+      BOOST_ENDPOINT_THROTTLE_INFO: 3/minute
+      BOOST_ENDPOINT_THROTTLE_ADD_OR_UPDATE: 3/hour
     healthcheck:
       test: [CMD, curl, -f, http://localhost:8080/healthz/]
       interval: 10s
