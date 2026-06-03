@@ -5,54 +5,40 @@
 # Dependabot version updates (opens PRs). Also enable in the repo UI:
 # Settings → Code security → Dependabot alerts / Dependabot security updates.
 # https://docs.astral.sh/uv/guides/integration/dependabot/
-#
-# uv: direct deps in pyproject.toml / dependency-groups; uv refreshes uv.lock.
-# allow: direct avoids PRs that only bump Weblate transitives (e.g. Django).
-# Weblate is bumped by weblate-pin-bump.yml, not Dependabot.
 
 version: 2
 
 updates:
+  # pyproject.toml + uv.lock (this project uses uv, not requirements.txt).
 - package-ecosystem: uv
   directory: /
   schedule:
-    interval: weekly
-    day: monday
-    time: "09:00"
+    # 09:00 Monday Etc/UTC via cron (unquoted time: 09:00 is invalid for Dependabot).
+    interval: cron
+    cronjob: 0 9 * * 1
     timezone: Etc/UTC
   open-pull-requests-limit: 10
   labels:
   - dependencies
   - python
-  allow:
-  - dependency-type: direct
-  ignore:
-  - dependency-name: Weblate
-  - dependency-name: weblate
+    # Note: dependency-type-based groups are not supported for uv yet
+    # (see dependabot/dependabot-core#13202). Group by semver bump size instead.
   groups:
-    dev-patch-minor:
-      patterns:
-      - coverage*
-      - prek
-      - pytest*
+    uv-patch-minor:
       update-types:
       - patch
       - minor
-    dev-major:
-      patterns:
-      - coverage*
-      - prek
-      - pytest*
+    uv-major:
       update-types:
       - major
 
-# Pinned third-party actions under .github/workflows/
+  # Pinned third-party actions under .github/workflows/
 - package-ecosystem: github-actions
   directory: /
   schedule:
-    interval: weekly
-    day: monday
-    time: "09:00"
+    # 09:00 Monday Etc/UTC via cron (unquoted time: 09:00 is invalid for Dependabot).
+    interval: cron
+    cronjob: 0 9 * * 1
     timezone: Etc/UTC
   open-pull-requests-limit: 5
   labels:
@@ -63,13 +49,13 @@ updates:
       patterns:
       - '*'
 
-# Hook repos + revs in .pre-commit-config.yaml
+  # Hook repos + revs in .pre-commit-config.yaml
 - package-ecosystem: pre-commit
   directory: /
   schedule:
-    interval: weekly
-    day: monday
-    time: "09:00"
+    # 09:00 Monday Etc/UTC via cron (unquoted time: 09:00 is invalid for Dependabot).
+    interval: cron
+    cronjob: 0 9 * * 1
     timezone: Etc/UTC
   open-pull-requests-limit: 5
   labels:
