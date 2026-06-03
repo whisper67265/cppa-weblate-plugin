@@ -82,7 +82,16 @@ docker compose -f docker/docker-compose.cd.yml --env-file .env build
 docker compose -f docker/docker-compose.cd.yml --env-file .env up -d
 ```
 
-The Dockerfile builds an overlay image on `weblate/weblate:latest`:
+The Dockerfile builds an overlay image on a **pinned** `weblate/weblate` tag aligned with the PyPI pin in `pyproject.toml`:
+
+| File | Example |
+|------|---------|
+| `pyproject.toml` | `Weblate[all]==2026.5` |
+| `docker/Dockerfile.weblate-plugin` | `FROM weblate/weblate:2026.5.0.0` |
+
+PyPI uses calver (`2026.5`, `2026.6.1`, …). Docker fixed production tags add patch and build components (`2026.5.0.0`, `2026.6.1.0`). CI enforces the mapping via `scripts/check-weblate-pin-sync.sh`. Bumps are proposed by the `Weblate pin bump` GitHub Actions workflow when both registries have the release.
+
+Build steps:
 
 1. Copies `settings_override.py` → `/app/data/settings-override.py`
 2. Installs the plugin into `/app/venv` via `uv pip install`

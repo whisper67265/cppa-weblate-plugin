@@ -6,7 +6,7 @@
 # CI builds with repo root as context (installs checked-out branch).
 # CD builds on the deploy server where the target branch is already checked out.
 
-FROM weblate/weblate:latest
+FROM weblate/weblate:2026.5.0.0
 
 # Base image ends with USER 1000; installing into /app/venv requires root.
 USER root

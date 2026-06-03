@@ -23,6 +23,8 @@ jobs:
     uses: ./.github/workflows/ci-package.yml
   dependencies:
     uses: ./.github/workflows/ci-dependencies.yml
+  weblate-pin:
+    uses: ./.github/workflows/ci-weblate-pin.yml
   plugin-smoke:
     uses: ./.github/workflows/ci-plugin-smoke.yml
   plugin-functional:

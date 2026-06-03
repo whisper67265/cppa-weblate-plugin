@@ -1,0 +1,23 @@
+# SPDX-FileCopyrightText: 2026 William Jin <AuraMindNest@outlook.com>
+#
+# SPDX-License-Identifier: BSL-1.0
+
+name: Weblate pin sync
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  weblate-pin-sync:
+    name: Weblate pin sync
+    runs-on: ubuntu-latest
+    steps:
+    # actions/checkout v6.0.2
+    - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+      with:
+        persist-credentials: false
+    - name: Check PyPI and Docker Weblate pins
+      run: bash scripts/check-weblate-pin-sync.sh

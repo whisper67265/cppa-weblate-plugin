@@ -8,19 +8,19 @@ requires = ["uv_build>=0.8.18,<0.12.0"]
 
 [dependency-groups]
 dev = [
-  "coverage[toml]>=7.6.0",
-  "pytest-cov>=7.1.0"
+  "coverage[toml]==7.14.0",
+  "pytest-cov==7.1.0"
 ]
 lint = [
   {include-group = "pre-commit"}
 ]
 plugin = [
-  "pytest>=8.3",
-  "pytest-timeout>=2.3.1"
+  "pytest==9.0.3",
+  "pytest-timeout==2.4.0"
 ]
 pre-commit = [
   "prek==0.3.13",
-  "pytest>=8.3"
+  "pytest==9.0.3"
 ]
 tooling = [
   {include-group = "lint"}
@@ -65,10 +65,10 @@ version = "1.0.0"
 
 [project.optional-dependencies]
 dev = [
-  "coverage[toml]>=7.6.0",
+  "coverage[toml]==7.14.0",
   "prek==0.3.13",
-  "pytest-cov>=7.1.0",
-  "pytest>=8.3"
+  "pytest-cov==7.1.0",
+  "pytest==9.0.3"
 ]
 
 [project.urls]
