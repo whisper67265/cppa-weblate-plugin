@@ -52,7 +52,7 @@ updates:
   schedule:
     interval: weekly
     day: monday
-    time: 09:00
+    time: "09:00"
     timezone: Etc/UTC
   open-pull-requests-limit: 5
   labels:
@@ -69,7 +69,7 @@ updates:
   schedule:
     interval: weekly
     day: monday
-    time: 09:00
+    time: "09:00"
     timezone: Etc/UTC
   open-pull-requests-limit: 5
   labels:
