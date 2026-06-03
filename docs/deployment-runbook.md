@@ -212,6 +212,48 @@ The full pipeline (`cd.yml`) triggers on a successful CI run against `develop`:
 
 Concurrency is locked per branch (`cancel-in-progress: false`) so deploys never overlap.
 
+## Release tagging
+
+Standalone GitHub Actions workflow ([`release.yml`](../.github/workflows/release.yml)). Run it only when you want to publish a version tag and GitHub Release.
+
+### When to run
+
+Use **Actions → Release → Run workflow** whenever the current `main` commit should be tagged. Typical cases:
+
+- After you are satisfied with what is on `main` (deploy or not)
+- When `pyproject.toml` on `main` already has the intended `version` and Weblate pin
+
+The workflow does not check deploy status or server health.
+
+### What it does
+
+1. Checks out `main` and reads [`pyproject.toml`](../pyproject.toml):
+   - Plugin version: `[project].version` (e.g. `1.0.0`)
+   - Weblate pin: `Weblate[all]==…` (e.g. `2026.5`)
+2. Fails if tag `v<plugin-version>` already exists on `origin` (prevents duplicate releases)
+3. Creates annotated tag `v<plugin-version>` on current `main` HEAD and pushes it
+4. Creates a GitHub Release with auto-generated notes, title `v<version> (Weblate <pin>)`, and body noting Weblate compatibility
+
+Use the release title and body to verify which Weblate version the tagged tree was built against.
+
+### Prerequisites
+
+- `version` in `pyproject.toml` on `main` must be the release you intend (bump on `develop` and promote, or commit on `main`, before running)
+- Tag `v<version>` must not already exist
+
+### Failure modes
+
+| Failure | Likely cause |
+|---------|----------------|
+| Tag already exists | Re-ran without bumping `version` in `pyproject.toml` |
+| Wrong release contents | `main` HEAD did not include the expected `pyproject.toml` |
+| `gh release create` failed | Permissions or network; check whether the tag was pushed and finish the release manually on GitHub |
+
+### Important
+
+- Tagging and GitHub Releases **do not deploy** or change servers
+- Deleting a GitHub Release **does not roll back** a deploy; reverting production is a separate server/git operation (see deploy sections above)
+
 ## Troubleshooting
 
 ### Container stays unhealthy

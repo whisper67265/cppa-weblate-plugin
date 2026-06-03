@@ -1,0 +1,81 @@
+# SPDX-FileCopyrightText: 2026 William Jin <AuraMindNest@outlook.com>
+#
+# SPDX-License-Identifier: BSL-1.0
+
+name: Release
+
+# Standalone tagging and GitHub Releases.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+    # actions/checkout v6.0.2
+    - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+      with:
+        ref: main
+        fetch-depth: 0
+
+    - name: Parse versions from pyproject.toml
+      id: versions
+      run: |
+        set -euo pipefail
+        python3 <<'PY' >> "$GITHUB_OUTPUT"
+        import re
+        import tomllib
+        from pathlib import Path
+
+        data = tomllib.loads(Path("pyproject.toml").read_text())
+        plugin_version = data["project"]["version"]
+        weblate_version = None
+        for dep in data["project"]["dependencies"]:
+            match = re.fullmatch(r"Weblate\[all\]==(.+)", dep)
+            if match:
+                weblate_version = match.group(1)
+                break
+        if not weblate_version:
+            raise SystemExit("Weblate[all]== pin not found in pyproject.toml")
+        print(f"plugin_version={plugin_version}")
+        print(f"weblate_version={weblate_version}")
+        print(f"tag=v{plugin_version}")
+        PY
+
+    - name: Fail if tag already exists
+      run: |
+        set -euo pipefail
+        tag="${{ steps.versions.outputs.tag }}"
+        if git ls-remote --tags origin "refs/tags/${tag}" | grep -q .; then
+          echo "Tag ${tag} already exists on origin"
+          exit 1
+        fi
+
+    - name: Configure git for tag push
+      run: |
+        git config user.name "github-actions[bot]"
+        git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+    - name: Create and push tag
+      run: |
+        set -euo pipefail
+        tag="${{ steps.versions.outputs.tag }}"
+        weblate_version="${{ steps.versions.outputs.weblate_version }}"
+        git tag -a "${tag}" -m "Release ${tag} (Weblate ${weblate_version})"
+        git push origin "${tag}"
+
+    - name: Create GitHub Release
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        set -euo pipefail
+        tag="${{ steps.versions.outputs.tag }}"
+        weblate_version="${{ steps.versions.outputs.weblate_version }}"
+        gh release create "${tag}" \
+          --title "${tag} (Weblate ${weblate_version})" \
+          --generate-notes \
+          --notes "Built against Weblate ${weblate_version}."

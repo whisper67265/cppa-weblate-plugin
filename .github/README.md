@@ -14,6 +14,7 @@ GitHub Actions and CI/CD helpers for this repository.
 |------|------|
 | [`workflows/ci.yml`](workflows/ci.yml) | Umbrella **CI** — runs on push/PR to `main` and `develop` |
 | [`workflows/cd.yml`](workflows/cd.yml) | **Deploy** — after CI succeeds on `develop` (staging); no `workflow_dispatch` trigger |
+| [`workflows/release.yml`](workflows/release.yml) | **Release** — manual `workflow_dispatch` only; tags `main` from `pyproject.toml` (`v<version>`) and creates a GitHub Release with Weblate compatibility metadata |
 | [`workflows/ci-lint.yml`](workflows/ci-lint.yml) | Lint and format (prek) |
 | [`workflows/ci-test.yml`](workflows/ci-test.yml) | Unit tests and coverage |
 | [`workflows/ci-package.yml`](workflows/ci-package.yml) | Build and package checks |
