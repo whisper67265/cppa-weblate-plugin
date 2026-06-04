@@ -21,6 +21,7 @@ docker compose -f docker/docker-compose.ci.yml up -d
 
 # CD on deploy server (copy .env.example to repo-root .env; set WEBLATE_URL_PREFIX, REDIS_DB, secrets):
 cp .env.example .env
+# set WEBLATE_URL_PREFIX, REDIS_DB, secrets and all needed values in .env file.
 docker compose -f docker/docker-compose.cd.yml --env-file .env build
 docker compose -f docker/docker-compose.cd.yml --env-file .env up -d
 ```
