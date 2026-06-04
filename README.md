@@ -296,7 +296,7 @@ Triggered on push and PR to `main` and `develop`. Calls eight reusable sub-workf
 
 All `ci-plugin-*` jobs build the CI Docker stack (`docker/docker-compose.ci.yml`), wait for the healthcheck, create an API token, run the corresponding pytest suite under `tests/plugin/`, and tear down.
 
-[`weblate-pin-bump.yml`](.github/workflows/weblate-pin-bump.yml) runs on a schedule (Monday 09:00 UTC) and opens a PR when a newer PyPI Weblate release has a matching Docker fixed tag. See [`.github/README.md`](.github/README.md#weblate-version-pinning).
+[`weblate-pin-bump.yml`](.github/workflows/weblate-pin-bump.yml) runs on a schedule (Monday 09:00 UTC) and opens a PR when a newer PyPI Weblate release has a matching Docker fixed tag. See [`.github/WORKFLOWS.md`](.github/WORKFLOWS.md#weblate-version-pinning).
 
 ### CD (`cd.yml`) and production promotion (`promote-main.yml`)
 
@@ -349,7 +349,7 @@ Each script builds `docker/docker-compose.ci.yml`, waits for health, runs its py
 | API reference | [`docs/boost-endpoint-api.md`](docs/boost-endpoint-api.md) | Full request/response docs for the Boost endpoint |
 | Route registration | [`docs/plugin-http-routes.md`](docs/plugin-http-routes.md) | How and why routes are registered at startup |
 | Docker files | [`docker/README.md`](docker/README.md) | Dockerfile and Compose usage for CI and CD |
-| CI/CD workflows | [`.github/README.md`](.github/README.md) | Workflow index, staging/production secrets, `PROMOTE_PAT` |
+| CI/CD workflows | [`.github/WORKFLOWS.md`](.github/WORKFLOWS.md) | Workflow index, staging/production secrets, `PROMOTE_PAT` |
 
 ## Contributing
 

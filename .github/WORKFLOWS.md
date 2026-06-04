@@ -4,9 +4,9 @@ SPDX-FileCopyrightText: 2026 William Jin <AuraMindNest@outlook.com>
 SPDX-License-Identifier: BSL-1.0
 -->
 
-# `.github/`
+# CI/CD workflows
 
-GitHub Actions and CI/CD helpers for this repository.
+GitHub Actions and CI/CD helpers for this repository (see [`.github/`](../.github/) for workflow YAML).
 
 ## Workflows
 
