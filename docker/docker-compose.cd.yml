@@ -10,6 +10,7 @@ services:
     build:
       context: ..
       dockerfile: docker/Dockerfile.weblate-plugin
+    # Operator config: copy .env.example to repo-root .env (see docs/deployment-runbook.md).
     env_file:
     - ../.env
     ports:
@@ -17,17 +18,14 @@ services:
     extra_hosts:
     - host.docker.internal:host-gateway
     environment:
-      WEBLATE_SITE_DOMAIN: ${WEBLATE_SITE_DOMAIN:-weblate.example.com}
-      WEBLATE_ADMIN_PASSWORD: ${WEBLATE_ADMIN_PASSWORD:?set in .env}
-      WEBLATE_DEBUG: ${WEBLATE_DEBUG:-0}
-      POSTGRES_HOST: host.docker.internal
-      POSTGRES_PORT: '5432'
-      POSTGRES_USER: ${POSTGRES_USER:-weblate_app}
+      # Fail-fast secrets
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set in .env}
-      POSTGRES_DATABASE: ${POSTGRES_DATABASE:-weblate_db}
+      WEBLATE_ADMIN_PASSWORD: ${WEBLATE_ADMIN_PASSWORD:?set in .env}
+      # CD topology pins
+      POSTGRES_HOST: host.docker.internal
+      POSTGRES_PORT: ${POSTGRES_PORT:-5432}
       REDIS_HOST: redis
-      REDIS_PORT: '6379'
-      CELERY_SINGLE_PROCESS: ${CELERY_SINGLE_PROCESS:-1}
+      REDIS_PORT: ${REDIS_PORT:-6379}
     healthcheck:
       test: [CMD, curl, -sf, 'http://localhost:8080${WEBLATE_URL_PREFIX:-}/healthz/']
       interval: 10s
@@ -43,7 +41,8 @@ services:
     networks:
     - bdc_redis
 
+# Join external Redis network (REDIS_EXTERNAL_NETWORK in .env).
 networks:
   bdc_redis:
     external: true
-    name: boost-data-collector_default
+    name: ${REDIS_EXTERNAL_NETWORK:?set in .env}

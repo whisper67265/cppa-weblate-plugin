@@ -14,7 +14,7 @@ Step-by-step guide for deploying `cppa-weblate-plugin` to a staging or productio
 |-------------|---------|
 | Docker Engine | 24 + with Compose v2 (`docker compose`) |
 | Host PostgreSQL | 16 recommended; a dedicated user and database (see [Database setup](#database-setup)) |
-| Redis | 7+; shared via the `boost-data-collector_default` external Docker network |
+| Redis | 7+; shared via external Docker network (`REDIS_EXTERNAL_NETWORK` in `.env`, required at `compose up`) |
 | Reverse proxy | nginx (or equivalent) terminating TLS and proxying to `127.0.0.1:8080` |
 | Git checkout | Repository cloned to `/opt/cppa-weblate-plugin` on the deploy server |
 
@@ -31,11 +31,13 @@ Ensure `pg_hba.conf` allows connections from the Docker bridge network (`172.17.
 
 ## Environment File
 
-Copy `.env.example` to the repo root as `.env` and fill in every value marked `replace-*`:
+Copy `.env.example` to the repo root as `.env` and fill in every value marked `replace-*` (including SMTP and GitHub credentials), and replace all `example.com` placeholders with your real hostname:
 
 ```bash
 cp .env.example .env
 ```
+
+Before the first deploy or any production upgrade, complete the [Pre-Deploy Checklist](#pre-deploy-checklist).
 
 ### Required secrets
 
@@ -44,34 +46,115 @@ cp .env.example .env
 | `POSTGRES_PASSWORD` | Host Postgres password for `weblate_app` |
 | `WEBLATE_ADMIN_PASSWORD` | Initial admin account password |
 
-Compose refuses to start if either is unset (enforced by `${VAR:?set in .env}` syntax in `docker-compose.cd.yml`).
+Compose refuses to start if either is unset (enforced by `${VAR:?set in .env}` in `docker-compose.cd.yml` `environment:`).
+
+### Production integration (`.env` only; fill before go-live)
+
+Weblate does not fail `compose up` if these are missing, but production needs them for real use:
+
+| Variable | Purpose |
+|----------|---------|
+| `WEBLATE_EMAIL_HOST`, `WEBLATE_EMAIL_HOST_USER`, `WEBLATE_EMAIL_HOST_PASSWORD` | Outbound mail (notifications, password reset). Use dummy `WEBLATE_EMAIL_BACKEND` only on staging without SMTP |
+| `WEBLATE_GITHUB_USERNAME`, `WEBLATE_GITHUB_TOKEN` | GitHub API and git operations; **required** for `POST /boost-endpoint/add-or-update/` Celery tasks (clone/push) |
+
+Rotate `WEBLATE_EMAIL_HOST_PASSWORD` and `WEBLATE_GITHUB_TOKEN` per the [Pre-Deploy Checklist](#pre-deploy-checklist).
+
+### Compose vs `.env`
+
+Docker Compose loads operator config from `env_file: ../.env`. The `environment:` block in `docker-compose.cd.yml` only sets:
+
+| Source | Variables | Purpose |
+|--------|-----------|---------|
+| **`environment:` fail-fast** | `POSTGRES_PASSWORD`, `WEBLATE_ADMIN_PASSWORD` | Refuse `compose up` if secrets are missing |
+| **`environment:` pins** | `POSTGRES_HOST`, `POSTGRES_PORT`, `REDIS_HOST`, `REDIS_PORT` | CD topology; overrides `.env` for these keys |
+| **`env_file` only** | All other keys in `.env.example` | Weblate, mail, GitHub, plugin throttles, `CELERY_SINGLE_PROCESS`, etc. |
+| **Compose-only (`.env`, not in container)** | `REDIS_EXTERNAL_NETWORK` | External network name Weblate joins (`:?` at compose up; must match `docker network ls` after BDC starts) |
+
+Do not duplicate pass-through vars in `environment:`; configure them once in `.env`. Set `REDIS_EXTERNAL_NETWORK` to the network that hosts Redis; only `REDIS_DB` tunes Redis logic inside the shared instance.
 
 ### Plugin-specific settings
 
-The plugin itself has **no dedicated env vars**. All wiring happens inside the Docker image at build time:
+Build-time wiring (no env vars):
 
 1. **`settings_override.py`** is copied to `/app/data/settings-override.py` by the Dockerfile. Weblate's Docker entrypoint `exec()`s this file during settings load.
 2. **`WEBLATE_FORMATS`** — the override reads upstream `FormatsConf.FORMATS` via regex, appends `boost_weblate.formats.quickbook.QuickBookFormat`, and writes the result back to `WEBLATE_FORMATS`. No env var needed.
 3. **`INSTALLED_APPS`** — the override appends `boost_weblate.endpoint.apps.BoostEndpointConfig`. The app's `ready()` hook then registers `/boost-endpoint/` routes on `weblate.urls.real_patterns`.
 
+Runtime plugin env vars (set in `.env`, read by `settings_override.py` at boot):
+
+| Variable | Production default | Notes |
+|----------|-------------------|-------|
+| `BOOST_ENDPOINT_THROTTLE_INFO` | `60/minute` | Scoped rate for `GET /boost-endpoint/info/` |
+| `BOOST_ENDPOINT_THROTTLE_ADD_OR_UPDATE` | `10/hour` | Scoped rate for `POST /boost-endpoint/add-or-update/` |
+
 ### Weblate environment variables
 
-Key variables set in the Compose file or `.env` (full reference in `.env.example`):
+Key variables (full reference in `.env.example`):
 
-| Variable | Default | Notes |
-|----------|---------|-------|
-| `WEBLATE_PORT` | `8080` | Host port bound to `127.0.0.1`; nginx proxies to this |
-| `WEBLATE_SITE_DOMAIN` | `weblate.example.com` | Public hostname (no scheme) |
-| `WEBLATE_URL_PREFIX` | `/weblate` | Subpath when behind nginx at `https://<host>/weblate/` |
-| `WEBLATE_DEBUG` | `0` | Set `1` only for troubleshooting |
-| `WEBLATE_ENABLE_HTTPS` | `1` | Required when TLS terminates at nginx |
-| `WEBLATE_IP_PROXY_HEADER` | `HTTP_X_FORWARDED_FOR` | Proxy header for real client IP |
-| `POSTGRES_HOST` | `host.docker.internal` | Reaches host Postgres via Docker gateway |
-| `POSTGRES_USER` | `weblate_app` | Must match the SQL `CREATE USER` above |
-| `POSTGRES_DATABASE` | `weblate_db` | Must match `CREATE DATABASE` above |
-| `REDIS_HOST` | `redis` | Resolved via the external `bdc_redis` network |
-| `REDIS_DB` | `1` | Logical DB to avoid clashing with other apps on shared Redis |
-| `CELERY_SINGLE_PROCESS` | `1` | Single Celery worker process; increase for heavier workloads |
+| Variable | Default | Set via | Notes |
+|----------|---------|---------|-------|
+| `WEBLATE_PORT` | `8080` | `.env` (compose interpolation) | Host port bound to `127.0.0.1`; nginx proxies to this |
+| `REDIS_EXTERNAL_NETWORK` | — | `.env` (compose `:?`) | **Required.** External Docker network for shared Redis (set to your BDC network name) |
+| `WEBLATE_SITE_DOMAIN` | — | `.env` | **Required.** Public hostname (no scheme); must match `WEBLATE_ALLOWED_HOSTS` |
+| `WEBLATE_URL_PREFIX` | `/weblate` | `.env` | Subpath when behind nginx at `https://<host>/weblate/` |
+| `WEBLATE_DEBUG` | `0` | `.env` | Set `1` only for troubleshooting |
+| `WEBLATE_ENABLE_HTTPS` | `1` | `.env` | Required when TLS terminates at nginx |
+| `WEBLATE_IP_PROXY_HEADER` | `HTTP_X_FORWARDED_FOR` | `.env` | Proxy header for real client IP |
+| `POSTGRES_HOST` | `host.docker.internal` | **Compose pin** | Not operator-configurable in CD |
+| `POSTGRES_PORT` | `5432` | **Compose pin** (`:-5432`) | Override in `.env` only if host Postgres uses a non-default port |
+| `POSTGRES_USER` | `weblate_app` | `.env` | Must match the SQL `CREATE USER` above |
+| `POSTGRES_DATABASE` | `weblate_db` | `.env` | Must match `CREATE DATABASE` above |
+| `REDIS_HOST` | `redis` | **Compose pin** | Service name on external `bdc_redis` network |
+| `REDIS_PORT` | `6379` | **Compose pin** (`:-6379`) | Not operator-configurable in CD unless compose default changed |
+| `REDIS_DB` | `1` | `.env` | Logical DB to avoid clashing with other apps on shared Redis |
+| `CELERY_SINGLE_PROCESS` | `1` | `.env` | Weblate Celery worker process count; increase when tasks queue |
+| `BOOST_ENDPOINT_THROTTLE_INFO` | `60/minute` | `.env` | Plugin rate limit (see above) |
+| `BOOST_ENDPOINT_THROTTLE_ADD_OR_UPDATE` | `10/hour` | `.env` | Plugin rate limit (see above) |
+| `WEBLATE_EMAIL_HOST` | `smtp.example.com` | `.env` | SMTP server; set user/password for production |
+| `WEBLATE_GITHUB_USERNAME` | — | `.env` | GitHub account for VCS; required with token for add-or-update |
+| `WEBLATE_GITHUB_TOKEN` | — | `.env` | GitHub PAT (`repo` scope); rotate via pre-deploy checklist |
+
+## Pre-Deploy Checklist
+
+Run before every production deploy or major upgrade. Copy into a change ticket if your process requires it.
+
+### Shared Redis network
+
+- [ ] Docker network from `REDIS_EXTERNAL_NETWORK` exists (`docker network inspect "$REDIS_EXTERNAL_NETWORK"` after sourcing `.env`)
+- [ ] Redis is reachable on that network (boost-data-collector stack running, or equivalent `redis` service attached to the same network name)
+- [ ] `REDIS_DB=1` in `.env` (default in `.env.example`) so Weblate does not clash with other apps on shared Redis
+
+### Secret rotation
+
+Review on a schedule or before upgrades:
+
+- [ ] `POSTGRES_PASSWORD` — rotate in Postgres (`ALTER USER weblate_app WITH PASSWORD '…'`) **and** in `.env`; restart stack. Updating `.env` alone is not enough.
+- [ ] `WEBLATE_ADMIN_PASSWORD` — update `.env` only for initial admin provisioning; existing admins change password in the Weblate UI
+- [ ] `WEBLATE_GITHUB_TOKEN` — rotate PAT in GitHub; update `.env`; restart so Celery clone/push tasks pick it up
+- [ ] `WEBLATE_EMAIL_HOST_PASSWORD` — rotate SMTP credential; update `.env`; restart
+- [ ] Weblate API tokens — rotate per-user tokens in the Weblate admin UI (not stored in `.env`)
+
+### Backup verification
+
+CD uses **host PostgreSQL** (`weblate_db`); there is no Postgres volume in `docker-compose.cd.yml`.
+
+- [ ] Confirm a recent `pg_dump` (or org backup job) of `weblate_db` exists and is restorable
+- [ ] Optional spot-check: verify backup artifact timestamp/size, or `pg_dump -h localhost -U weblate_app weblate_db` succeeds
+- [ ] Note: container `/app/data` (SSH keys, `known_hosts`) is not bind-mounted in CD — if Git operations fail after rollback, see [GitHub SSH host key errors](#github-ssh-host-key-errors)
+
+### Rollback readiness
+
+- [ ] Record current SHA before deploy: `git rev-parse HEAD` (or note last known-good release tag `v<version>` from [`release.yml`](../.github/workflows/release.yml))
+- [ ] Know the rollback command (also in [Rollback (production or staging)](#rollback-production-or-staging)):
+  ```bash
+  cd /opt/cppa-weblate-plugin
+  git fetch origin
+  git checkout <previous-tag-or-sha>
+  docker compose -f docker/docker-compose.cd.yml --env-file .env build
+  docker compose -f docker/docker-compose.cd.yml --env-file .env up -d
+  ```
+- [ ] Plan to re-run [Post-Deploy Validation](#post-deploy-validation) after rollback
+- [ ] GitHub Release tags do **not** auto-deploy; rollback is server-side git + compose only
 
 ## Build and Start
 
@@ -341,7 +424,7 @@ Common causes:
 | `connection refused` on Postgres | `pg_hba.conf` or firewall blocking Docker bridge | Allow `172.17.0.0/16` in `pg_hba.conf`; reload Postgres |
 | `WEBLATE_ADMIN_PASSWORD … set in .env` | `.env` missing or variable unset | Ensure `.env` exists at repo root with both required secrets |
 | `${WEBLATE_URL_PREFIX}/healthz/` 404 | `WEBLATE_URL_PREFIX` mismatch | Ensure `.env` has `WEBLATE_URL_PREFIX` matching nginx config |
-| Redis connection error | External network missing | Run `docker network create boost-data-collector_default` or start the BDC stack first |
+| Redis connection error | External network missing | Start the BDC stack, or `docker network create "$REDIS_EXTERNAL_NETWORK"` (value from `.env`) |
 
 ### GitHub SSH host key errors
 
