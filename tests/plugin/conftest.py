@@ -22,6 +22,40 @@ TEST_LANG_CODE = "zh_Hans"
 TEST_BRANCH = f"local-{TEST_LANG_CODE}"
 TEST_VERSION = "test-1.0.0"
 
+# E2E class must run before add-or-update Celery flow in test_functional.py.
+_FUNCTIONAL_CLASS_ORDER = (
+    "TestQuickBookRoundTrip",
+    "TestBoostComponentServiceE2E",
+    "TestAddOrUpdateCeleryFlow",
+)
+
+
+def pytest_collection_modifyitems(items: list[pytest.Item]) -> None:
+    """Enforce functional test class order (pytest default order is not guaranteed)."""
+    order_index = {name: i for i, name in enumerate(_FUNCTIONAL_CLASS_ORDER)}
+
+    def sort_key(item: pytest.Item) -> tuple[int, int, str]:
+        cls = getattr(item, "cls", None)
+        if cls is None:
+            return (len(_FUNCTIONAL_CLASS_ORDER), 0, item.nodeid)
+        line = item.location[1] if item.location else 0
+        return (
+            order_index.get(cls.__name__, len(_FUNCTIONAL_CLASS_ORDER)),
+            line,
+            item.nodeid,
+        )
+
+    functional = [
+        item
+        for item in items
+        if item.nodeid.startswith("tests/plugin/test_functional.py")
+    ]
+    if not functional:
+        return
+    functional.sort(key=sort_key)
+    others = [item for item in items if item not in functional]
+    items[:] = others + functional
+
 
 @pytest.fixture(scope="session")
 def live_base_url() -> str:
@@ -73,4 +107,11 @@ def test_repo(weblate_ssh_pubkey: str) -> EphemeralGitHubRepo:
         manager.add_deploy_key(weblate_ssh_pubkey)
         yield manager
     finally:
-        manager.delete_repo()
+        try:
+            manager.delete_repo()
+        except Exception as exc:
+            print(
+                f"WARNING: failed to delete ephemeral repo {repo_name}: {exc}",
+                flush=True,
+            )
+            raise

@@ -78,9 +78,11 @@ def rate_limit_api_token() -> str:
     return docker_exec_python(_RATE_LIMIT_USER_SNIPPET.strip())
 
 
+@pytest.mark.slow
 class TestBoostEndpointRateLimit:
     """Live-stack rate limit enforcement for Boost endpoint routes."""
 
+    @pytest.mark.timeout(60)
     def test_info_returns_429_when_rate_limited(
         self, rate_limit_api_token: str
     ) -> None:
@@ -108,6 +110,7 @@ class TestBoostEndpointRateLimit:
         if get_response_header(last_headers, "X-RateLimit-Limit") is not None:
             assert int(get_response_header(last_headers, "X-RateLimit-Limit")) == limit
 
+    @pytest.mark.timeout(60)
     def test_add_or_update_returns_429_when_rate_limited(
         self, rate_limit_api_token: str
     ) -> None:

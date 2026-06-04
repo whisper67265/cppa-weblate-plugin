@@ -33,6 +33,8 @@ jobs:
         version: 0.11.12
 
     - name: Run plugin auth tests
+      env:
+        HEALTH_TIMEOUT: '240'
       run: bash scripts/plugin-auth.sh
 
     - name: Upload logs on failure

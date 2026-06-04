@@ -82,9 +82,11 @@ def created_project_component(weblate_api: WeblateAPI) -> CreatedProjectComponen
 # ---------------------------------------------------------------------------
 
 
+@pytest.mark.slow
 class TestQuickBookRoundTrip:
     """Upload QBK, translate a unit, download translated file."""
 
+    @pytest.mark.timeout(120)
     def test_units_extracted(
         self,
         weblate_api: WeblateAPI,
@@ -102,6 +104,7 @@ class TestQuickBookRoundTrip:
         ]
         assert any(KNOWN_SOURCE_STRING in s for s in sources), sources[:5]
 
+    @pytest.mark.timeout(120)
     def test_submit_translation(
         self,
         weblate_api: WeblateAPI,
@@ -120,6 +123,7 @@ class TestQuickBookRoundTrip:
         unit_url = WeblateAPI.unit_api_url(match)
         weblate_api.submit_translation(unit_url, ZH_HANS_TRANSLATION)
 
+    @pytest.mark.timeout(120)
     def test_download_translated_qbk(
         self,
         weblate_api: WeblateAPI,
@@ -140,6 +144,7 @@ class TestQuickBookRoundTrip:
 # ---------------------------------------------------------------------------
 
 
+@pytest.mark.slow
 class TestBoostComponentServiceE2E:
     """Exercise BoostComponentService inside the Weblate container."""
 
@@ -215,6 +220,7 @@ if {run_process_all!r}:
 print(json.dumps(out))
 """
 
+    @pytest.mark.timeout(180)
     def test_clone_and_scan(self, exec_python, test_repo: EphemeralGitHubRepo) -> None:
         out = json.loads(
             exec_python(self._service_snippet(test_repo, run_process_all=False))
@@ -224,6 +230,7 @@ print(json.dumps(out))
         assert "quickbook" in formats
         assert any(c["format"] == "asciidoc" for c in out["configs"])
 
+    @pytest.mark.timeout(180)
     def test_project_component_creation(
         self, exec_python, test_repo: EphemeralGitHubRepo
     ) -> None:
@@ -253,6 +260,7 @@ print("ok")
         )
         assert check == "ok"
 
+    @pytest.mark.timeout(180)
     def test_idempotency(self, exec_python, test_repo: EphemeralGitHubRepo) -> None:
         out = json.loads(
             exec_python(
@@ -291,9 +299,11 @@ def add_or_update_task(api_token: str, test_repo: EphemeralGitHubRepo) -> str:
     return str(data["task_id"])
 
 
+@pytest.mark.slow
 class TestAddOrUpdateCeleryFlow:
     """POST /boost-endpoint/add-or-update/ and poll Celery completion."""
 
+    @pytest.mark.timeout(360)
     def test_add_or_update_task_completes(
         self, weblate_api: WeblateAPI, add_or_update_task: str
     ) -> None:

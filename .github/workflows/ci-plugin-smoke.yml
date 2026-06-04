@@ -33,6 +33,8 @@ jobs:
         version: 0.11.12
 
     - name: Run plugin smoke tests
+      env:
+        HEALTH_TIMEOUT: '240'
       run: bash scripts/plugin-smoke.sh
 
     - name: Upload logs on failure

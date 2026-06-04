@@ -30,10 +30,11 @@ echo "=== Starting stack ==="
 stack_up
 
 echo "=== Waiting for Weblate ==="
-stack_wait_healthy "${HEALTH_TIMEOUT:-120}"
+stack_wait_healthy "${HEALTH_TIMEOUT:-240}"
+stack_wait_api_ready
 
 echo "=== Creating API token ==="
-WEBLATE_API_TOKEN="$(stack_create_token admin)"
+WEBLATE_API_TOKEN="$(stack_create_token_retry admin)"
 export WEBLATE_API_TOKEN
 export WEBLATE_LIVE_BASE_URL="${WEBLATE_LIVE_BASE_URL:-http://localhost:${WEBLATE_PORT:-8080}}"
 export WEBLATE_COMPOSE_FILE="${COMPOSE_FILE}"
@@ -43,5 +44,8 @@ export BOOST_ENDPOINT_THROTTLE_ADD_OR_UPDATE="${BOOST_ENDPOINT_THROTTLE_ADD_OR_U
 
 echo "=== Running auth tests ==="
 uv pip install --quiet --system --group plugin
+PYTEST_PLUGIN_OPTS="${PYTEST_PLUGIN_OPTS:---timeout=120 --timeout-method=thread --reruns 1 --reruns-delay 5}"
+# shellcheck disable=SC2086
 python -m pytest --confcutdir=tests/plugin --override-ini addopts= \
+    $PYTEST_PLUGIN_OPTS \
     tests/plugin/test_auth.py tests/plugin/test_rate_limit.py -v

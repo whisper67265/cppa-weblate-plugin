@@ -27,6 +27,35 @@ GitHub Actions and CI/CD helpers for this repository.
 
 Callable workflows (`ci-*`, `ci-plugin-*`) are triggered only via `workflow_call` from `ci.yml`, not directly on push.
 
+## Plugin integration jobs
+
+Three callable workflows exercise the live Weblate Docker stack ([`docker/docker-compose.ci.yml`](../docker/docker-compose.ci.yml)). Each job builds the image, runs `compose up -d --wait`, probes `/healthz/` and the Boost ping endpoint, creates an API token (with retry), then runs pytest with `pytest-timeout` and one rerun on failure.
+
+| Job | Workflow | Typical duration | Hard limit (`timeout-minutes`) | Notes |
+|-----|----------|------------------|--------------------------------|-------|
+| Plugin smoke | [`ci-plugin-smoke.yml`](workflows/ci-plugin-smoke.yml) | ~8–12 min | 15 | Stack image build dominates |
+| Plugin functional | [`ci-plugin-functional.yml`](workflows/ci-plugin-functional.yml) | ~15–22 min | 25 | GitHub E2E needs repository secret |
+| Plugin auth | [`ci-plugin-auth.yml`](workflows/ci-plugin-auth.yml) | ~8–12 min | 10 | Auth + rate-limit tests |
+
+### Secrets and environment
+
+| Variable | Where | Purpose |
+|----------|-------|---------|
+| `GH_TEST_REPO_TOKEN` | Repository secret (functional job only) | Classic PAT with `repo` scope for ephemeral GitHub repos in [`tests/plugin/test_functional.py`](../tests/plugin/test_functional.py). If unset, GitHub/Celery E2E tests are skipped. |
+| `HEALTH_TIMEOUT` | CI workflow env / shell default | Seconds to wait for `/healthz/` after compose `--wait`. Defaults: smoke/auth **240**, functional **300**. |
+| `PYTEST_PLUGIN_OPTS` | Optional override in entrypoint scripts | Default includes `--timeout`, `--timeout-method=thread`, `--reruns 1`, `--reruns-delay 5`. Smoke/auth use `--timeout=120`; functional uses `--timeout=300`. |
+| `WEBLATE_PORT` | Optional | Host port for Weblate (default **8080**). |
+
+### Local reproduction
+
+```bash
+bash scripts/plugin-smoke.sh
+bash scripts/plugin-auth.sh
+GH_TEST_REPO_TOKEN=<classic PAT with repo> bash scripts/plugin-functional.sh
+```
+
+Skip slow plugin tests during local iteration: add `-m "not slow"` to the pytest invocation in the script, or set `PYTEST_PLUGIN_OPTS` accordingly.
+
 ## Other paths
 
 | Path | Role |

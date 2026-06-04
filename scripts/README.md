@@ -24,5 +24,8 @@ bash scripts/plugin-smoke.sh
 source scripts/lib/weblate-stack.sh
 stack_build
 stack_up
-stack_wait_healthy 120
+stack_wait_healthy 240
+stack_wait_api_ready
 ```
+
+CI entrypoints use `compose up -d --wait`, `HEALTH_TIMEOUT` (smoke/auth **240**, functional **300**), `stack_create_token_retry`, and `PYTEST_PLUGIN_OPTS` for pytest timeout/reruns. See [`.github/README.md`](../.github/README.md#plugin-integration-jobs).

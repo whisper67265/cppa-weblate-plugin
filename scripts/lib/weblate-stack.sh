@@ -16,11 +16,12 @@ stack_build() {
 }
 
 stack_up() {
-    compose up -d "$@"
+    # Wait for compose healthchecks (Postgres, Redis, Weblate) before returning.
+    compose up -d --wait "$@"
 }
 
 stack_wait_healthy() {
-    local timeout="${1:-120}"
+    local timeout="${1:-240}"
     local port="${WEBLATE_PORT:-8080}"
     local url="http://localhost:${port}/healthz/"
     local interval=5
@@ -39,6 +40,27 @@ stack_wait_healthy() {
     echo "ERROR: Weblate did not become healthy in ${timeout}s."
     echo "--- weblate container logs ---"
     compose logs weblate | tail -80
+    return 1
+}
+
+stack_wait_api_ready() {
+    local port="${WEBLATE_PORT:-8080}"
+    local url="http://localhost:${port}/boost-endpoint/plugin-ping/"
+    local attempts="${1:-12}"
+    local interval="${2:-5}"
+    local i=0
+
+    echo "Waiting for Boost endpoint at ${url}..."
+    while [ "$i" -lt "$attempts" ]; do
+        if curl -sf "$url" > /dev/null 2>&1; then
+            echo "Boost endpoint is ready (after $((i * interval))s)."
+            return 0
+        fi
+        sleep "$interval"
+        i=$((i + 1))
+    done
+
+    echo "ERROR: Boost endpoint did not become ready in $((attempts * interval))s."
     return 1
 }
 
@@ -77,6 +99,29 @@ u = User.objects.get(username=os.environ["WEBLATE_CI_USERNAME"])
 Token.objects.filter(user=u).delete()
 t = Token.objects.create(user=u, key=get_token("wlp" if u.is_bot else "wlu"))
 print(t.key)'
+}
+
+stack_create_token_retry() {
+    local user="${1:-admin}"
+    local attempts="${2:-3}"
+    local interval="${3:-5}"
+    local attempt=1
+    local token=""
+
+    while [ "$attempt" -le "$attempts" ]; do
+        if token="$(stack_create_token "$user")" && [ -n "$token" ]; then
+            echo "$token"
+            return 0
+        fi
+        if [ "$attempt" -lt "$attempts" ]; then
+            echo "Token creation attempt ${attempt}/${attempts} failed; retrying in ${interval}s..." >&2
+            sleep "$interval"
+        fi
+        attempt=$((attempt + 1))
+    done
+
+    echo "ERROR: Failed to create API token for user ${user} after ${attempts} attempts." >&2
+    return 1
 }
 
 stack_logs() {
