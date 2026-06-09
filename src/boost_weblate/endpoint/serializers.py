@@ -75,50 +75,82 @@ class AddOrUpdateRequestSerializer(serializers.Serializer):
         for field, messages in self.errors.items():
             if field == "add_or_update" and self._custom_validation_errors:
                 continue
-            for subfield, message in self._flatten_field_errors(field, messages):
-                code = self._code_for_drf_error(field, message)
+            for subfield, message, drf_code in self._flatten_field_errors(
+                field, messages
+            ):
+                code = self._code_for_drf_error(field, drf_code, subfield=subfield)
                 metadata: dict[str, Any] = {"field": field}
+                if drf_code is not None:
+                    metadata["drf_code"] = drf_code
                 if subfield and field == "add_or_update":
                     metadata["language"] = subfield
                 structured.append(to_error_dict(code, message, **metadata))
         return structured
 
     @staticmethod
+    def _message_and_drf_code(err: Any) -> tuple[str, str | None]:
+        return str(err), getattr(err, "code", None)
+
+    @staticmethod
     def _flatten_field_errors(
         field: str, messages: Any
-    ) -> list[tuple[str | None, str]]:
-        """Flatten nested DRF ErrorDict structures into (subfield, message) pairs."""
-        results: list[tuple[str | None, str]] = []
+    ) -> list[tuple[str | None, str, str | None]]:
+        """Flatten nested DRF errors into (subfield, message, drf_code) triplets."""
+        results: list[tuple[str | None, str, str | None]] = []
         if isinstance(messages, dict) or hasattr(messages, "items"):
             for key, value in messages.items():
                 key_str = str(key)
                 if isinstance(value, (list, tuple)):
                     for msg in value:
-                        if isinstance(msg, (dict,)) or hasattr(msg, "items"):
+                        if isinstance(msg, dict) or hasattr(msg, "items"):
+                            nested = AddOrUpdateRequestSerializer._flatten_field_errors(
+                                field, msg
+                            )
                             results.extend(
-                                AddOrUpdateRequestSerializer._flatten_field_errors(
-                                    field, msg
-                                )
+                                (key_str if sub is None else sub, message, drf_code)
+                                for sub, message, drf_code in nested
                             )
                         else:
-                            results.append((key_str, str(msg)))
-                elif isinstance(value, (dict,)) or hasattr(value, "items"):
+                            message, drf_code = (
+                                AddOrUpdateRequestSerializer._message_and_drf_code(msg)
+                            )
+                            results.append((key_str, message, drf_code))
+                elif isinstance(value, dict) or hasattr(value, "items"):
                     nested = AddOrUpdateRequestSerializer._flatten_field_errors(
                         field, value
                     )
-                    results.extend((key_str, msg) for _sub, msg in nested)
+                    results.extend(
+                        (key_str if sub is None else sub, message, drf_code)
+                        for sub, message, drf_code in nested
+                    )
                 else:
-                    results.append((key_str, str(value)))
+                    message, drf_code = (
+                        AddOrUpdateRequestSerializer._message_and_drf_code(value)
+                    )
+                    results.append((key_str, message, drf_code))
         else:
             for msg in messages:
-                results.append((None, str(msg)))
+                message, drf_code = AddOrUpdateRequestSerializer._message_and_drf_code(
+                    msg
+                )
+                results.append((None, message, drf_code))
         return results
 
     @staticmethod
-    def _code_for_drf_error(field: str, message: str) -> BoostEndpointErrorCode:
-        lower = message.lower()
-        if field == "add_or_update" and ("list" in lower or "not a valid" in lower):
+    def _code_for_drf_error(
+        field: str,
+        drf_code: str | None,
+        *,
+        subfield: str | None = None,
+    ) -> BoostEndpointErrorCode:
+        if drf_code == "required":
+            return BoostEndpointErrorCode.REQUIRED_FIELD
+        if drf_code == "not_a_list":
             return BoostEndpointErrorCode.INVALID_SUBMODULE_LIST
+        if drf_code == "empty":
+            if field == "add_or_update" and subfield:
+                return BoostEndpointErrorCode.INVALID_SUBMODULE_LIST
+            return BoostEndpointErrorCode.REQUIRED_FIELD
         return BoostEndpointErrorCode.REQUIRED_FIELD
 
     def validate_extensions(self, value: list[str] | None) -> list[str] | None:

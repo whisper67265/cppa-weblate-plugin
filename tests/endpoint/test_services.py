@@ -18,6 +18,7 @@ from boost_weblate.endpoint.errors import BoostEndpointErrorCode
 from boost_weblate.endpoint.services import (
     BoostComponentService,
     _build_extension_to_format,
+    _git_commit_and_push_removals,
     _submodule_slug,
     truncate_component_name,
     truncate_component_slug,
@@ -731,6 +732,61 @@ class TestAddLanguageToComponent:
 
 
 # ---------------------------------------------------------------------------
+# _git_commit_and_push_removals
+# ---------------------------------------------------------------------------
+
+
+class TestGitCommitAndPushRemovals:
+    def test_commit_limits_paths_to_removed_files(self) -> None:
+        mock_status = MagicMock()
+        mock_status.returncode = 0
+        mock_status.stdout = "D zh_Hans/intro.adoc\n"
+
+        with patch("boost_weblate.endpoint.services.subprocess.run") as mock_run:
+            mock_run.side_effect = [MagicMock(), mock_status, MagicMock()]
+            ok, err, committed = _git_commit_and_push_removals(
+                "/repo",
+                ["zh_Hans/intro.adoc", "zh_Hans/other.adoc"],
+                name="TestComp",
+                push_url=None,
+                push_branch=None,
+            )
+
+        assert ok is True
+        assert err is None
+        assert committed is True
+        commit_args = mock_run.call_args_list[2].args[0]
+        assert commit_args[3] == "commit"
+        sep = commit_args.index("--")
+        assert commit_args[sep + 1 :] == [
+            "zh_Hans/intro.adoc",
+            "zh_Hans/other.adoc",
+        ]
+
+    def test_git_status_failure_returns_error(self) -> None:
+        mock_status = MagicMock()
+        mock_status.returncode = 128
+        mock_status.stderr = "fatal: not a git repository"
+
+        with patch("boost_weblate.endpoint.services.subprocess.run") as mock_run:
+            mock_run.side_effect = [MagicMock(), mock_status]
+            ok, err, committed = _git_commit_and_push_removals(
+                "/repo",
+                ["zh_Hans/intro.adoc"],
+                name="TestComp",
+                push_url=None,
+                push_branch=None,
+            )
+
+        assert ok is False
+        assert committed is False
+        assert err is not None
+        assert err["code"] == BoostEndpointErrorCode.GIT_PUSH_FAILED.value
+        assert err["metadata"]["returncode"] == 128
+        assert mock_run.call_count == 2
+
+
+# ---------------------------------------------------------------------------
 # _delete_component_and_commit_removal (mocks component + subprocess)
 # ---------------------------------------------------------------------------
 
@@ -769,11 +825,13 @@ class TestDeleteComponentAndCommitRemoval:
 
     def _git_success_side_effect(self):
         mock_status = MagicMock()
+        mock_status.returncode = 0
         mock_status.stdout = "D zh_Hans/intro.adoc\n"
         return [MagicMock(), mock_status, MagicMock(), MagicMock()]
 
     def _git_push_failure_side_effect(self):
         mock_status = MagicMock()
+        mock_status.returncode = 0
         mock_status.stdout = "D zh_Hans/intro.adoc\n"
         err = subprocess.CalledProcessError(1, "git", stderr="push failed")
         return [MagicMock(), mock_status, MagicMock(), err, MagicMock()]

@@ -135,6 +135,25 @@ def _git_commit_and_push_removals(
             timeout=10,
             check=False,
         )
+        if git_status.returncode != 0:
+            stderr = (git_status.stderr or "").strip()
+            LOGGER.warning(
+                "Git status failed for %s (exit %s): %s",
+                name,
+                git_status.returncode,
+                stderr,
+            )
+            return (
+                False,
+                to_error_dict(
+                    BoostEndpointErrorCode.GIT_PUSH_FAILED,
+                    f"Git status failed (exit {git_status.returncode}): {stderr}",
+                    component_name=name,
+                    stderr=stderr[:500],
+                    returncode=git_status.returncode,
+                ),
+                committed,
+            )
         if git_status.stdout.strip():
             committer = getattr(settings, "DEFAULT_COMMITER_NAME", "Weblate")
             email = getattr(
@@ -153,6 +172,8 @@ def _git_commit_and_push_removals(
                     f"Remove translation files for deleted component: {name}",
                     "--author",
                     author,
+                    "--",
+                    *rel_paths,
                 ],
                 check=True,
                 capture_output=True,
