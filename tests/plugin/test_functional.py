@@ -58,7 +58,7 @@ def created_project_component(weblate_api: WeblateAPI) -> CreatedProjectComponen
     """Project + QuickBook component for round-trip tests."""
     project_slug = WeblateAPI.unique_slug("func-qbk")
     component_slug = "qbk-fixture"
-    weblate_api.create_project("Functional QBK", project_slug)
+    weblate_api.create_project(f"Functional QBK {project_slug}", project_slug)
     # Docfile multipart upload (no empty local VCS template paths).
     created = weblate_api.create_component_from_docfile(
         project_slug,
