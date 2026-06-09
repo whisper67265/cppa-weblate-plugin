@@ -150,10 +150,22 @@ See [Request reference](#request-reference) for the full body schema.
 
 ```json
 {
-  "errors": {
-    "organization": ["This field is required."],
-    "add_or_update": {"": ["This field is required."]}
-  }
+  "errors": [
+    {
+      "code": "required_field",
+      "message": "This field is required.",
+      "metadata": {"field": "organization", "drf_code": "required"}
+    },
+    {
+      "code": "invalid_submodule_list",
+      "message": "Expected a list of items but got type \"str\".",
+      "metadata": {
+        "field": "add_or_update",
+        "language": "zh_Hans",
+        "drf_code": "not_a_list"
+      }
+    }
+  ]
 }
 ```
 
@@ -211,7 +223,7 @@ This processes the `json` and `unordered` submodules for Simplified Chinese, and
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `errors` | object | DRF serializer error map: field name → list of error strings |
+| `errors` | array | Unified list of structured error objects (see [Error handling](#error-handling)) |
 
 ### 401 Unauthorized
 
@@ -239,12 +251,22 @@ The Celery task (`boost_add_or_update_task`) returns a dictionary keyed by langu
       },
       {
         "submodule": "unordered",
-        "success": true,
-        "components_created": 2,
-        "components_updated": 1,
+        "success": false,
+        "components_created": 0,
+        "components_updated": 0,
         "components_failed": 0,
         "components_deleted": 0,
-        "errors": []
+        "errors": [
+          {
+            "code": "clone_failed",
+            "message": "Failed to clone repository for unordered",
+            "metadata": {
+              "submodule": "unordered",
+              "organization": "boostorg",
+              "lang_code": "zh_Hans"
+            }
+          }
+        ]
       }
     ]
   },
@@ -271,7 +293,7 @@ The Celery task (`boost_add_or_update_task`) returns a dictionary keyed by langu
 | `components_updated` | integer | Existing components whose push branch was refreshed |
 | `components_failed` | integer | Components where `create_or_update_component` returned `None` |
 | `components_deleted` | integer | Components removed because they were no longer found in the repo scan |
-| `errors` | array of strings | Non-fatal error messages (clone failure, permission denial, git errors) |
+| `errors` | array of objects | Non-fatal structured errors (`code`, `message`, `metadata`); see [Error handling](#error-handling) |
 
 ---
 
@@ -303,7 +325,7 @@ The task uses Weblate's own Celery `app` instance (`weblate.utils.celery.app`) a
 
 `user_id` (an integer primary key) is passed rather than the user object itself because Celery serializes task arguments to JSON. The task re-fetches the user with `User.objects.get(pk=user_id)` inside the worker.
 
-Exceptions raised by `BoostComponentService` propagate out of the task function unhandled, causing Celery to mark the task `FAILURE`. Per-submodule errors that are recoverable (e.g. clone failure, permission denial for a single component) are collected into the `errors` list and do not raise exceptions.
+Fatal task failures raise `BoostEndpointError` (a `WeblateError` subclass from `weblate.trans.exceptions`) with a stable `code` and `metadata`, causing Celery to mark the task `FAILURE`. Examples: `task_user_not_found` when the `user_id` no longer exists, or `task_internal_error` for unexpected exceptions (after `report_error()`). Per-submodule errors that are recoverable (e.g. clone failure, permission denial for a single submodule) are collected into the submodule `errors` list as structured objects and do not raise exceptions.
 
 `trail=False` is set on the task to suppress Celery's default task-result trail and avoid unbounded result-backend growth in long-running deployments.
 
@@ -366,9 +388,49 @@ For each submodule the following steps run in order:
 
 ## Error handling
 
-The service uses a non-fatal error collection strategy: individual failures are appended to the `errors` list in the submodule result and processing continues with the next item. The `success` flag is `false` only when every component in the submodule failed or the clone itself failed.
+All Boost endpoint errors share one JSON-serializable shape (`src/boost_weblate/endpoint/errors.py`):
 
-Exceptions that escape `process_submodule` or `process_all` propagate to the Celery task, which lets them surface as a `FAILURE` state so monitoring systems can alert. Internal exceptions within `create_or_update_component`, `add_language_to_component`, and `_delete_component_and_commit_removal` are caught, logged via Weblate's `LOGGER`, reported to Weblate's error-tracking system via `report_error()`, and reflected as incremented failure counters or appended error strings.
+| Field | Type | Description |
+|-------|------|-------------|
+| `code` | string | Stable machine-readable identifier (see table below) |
+| `message` | string | Human-readable description |
+| `metadata` | object | Context for monitoring, retry logic, and client handling |
+
+### Where errors appear
+
+| Layer | HTTP status / Celery state | Shape |
+|-------|---------------------------|-------|
+| Request validation | `400 Bad Request` | `{"errors": [<error>, ...]}` |
+| Recoverable submodule failure | `202` accepted; task `SUCCESS` with partial failures | `submodule_results[].errors: [<error>, ...]` |
+| Fatal task failure | Task `FAILURE` | `BoostEndpointError` exception with `.code` and `.metadata` |
+
+HTTP `400` responses and submodule `errors` lists use the same object schema. Validation errors may include `metadata.field`, `metadata.language`, and `metadata.drf_code` (the original DRF `ErrorDetail.code` when applicable).
+
+### Error codes
+
+| Code | Typical source |
+|------|----------------|
+| `required_field` | Missing `organization`, `version`, or `add_or_update`; empty `add_or_update` dict |
+| `invalid_language_code` | Non-string or blank language key in `add_or_update` |
+| `invalid_submodule_list` | Submodule value is not a non-empty list |
+| `invalid_submodule` | Submodule name fails path validation |
+| `clone_failed` | `git clone` failed or timed out |
+| `no_documentation_files` | No supported doc files found after scan |
+| `permission_denied` | Missing `project.add` or `project.edit` |
+| `project_create_failed` | Project `get_or_create` raised |
+| `component_delete_failed` | Stale component deletion failed |
+| `file_remove_failed` | Translation file removal from disk failed |
+| `git_push_failed` | Git status, commit, or push failed |
+| `git_push_timeout` | Git commit/push subprocess timeout |
+| `all_components_failed` | Every scanned component failed create/update |
+| `task_user_not_found` | Celery task `user_id` not found |
+| `task_internal_error` | Unexpected exception in the Celery task |
+
+### Recoverable vs fatal
+
+The service uses a non-fatal error collection strategy: individual submodule failures are appended to `errors` and processing continues with the next submodule. The `success` flag is `false` when no component was created or updated for that submodule (including clone failure).
+
+Internal exceptions within `create_or_update_component`, `add_language_to_component`, and `_delete_component_and_commit_removal` are caught, logged via Weblate's `LOGGER`, reported via `report_error()`, and reflected as incremented failure counters or structured entries in `errors`. Unexpected exceptions that escape `process_all` are wrapped as `BoostEndpointError` in the Celery task.
 
 ---
 
