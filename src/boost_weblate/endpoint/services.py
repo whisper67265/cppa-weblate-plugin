@@ -100,6 +100,111 @@ def truncate_component_slug(slug: str, max_len: int = MAX_COMPONENT_SLUG_LENGTH)
     return slug[:head_len] + hash_suffix
 
 
+def _git_commit_and_push_removals(
+    base_path: str,
+    rel_paths: list[str],
+    *,
+    name: str,
+    push_url: str | None,
+    push_branch: str | None,
+) -> tuple[bool, str | None, bool]:
+    """
+    Stage removed files, commit, and optionally push.
+
+    Returns (success, error_message, committed). ``committed`` is True when a
+    local commit was created (used to choose rollback strategy on push failure).
+    """
+    committed = False
+    try:
+        subprocess.run(
+            ["git", "-C", base_path, "add", "--", *rel_paths],
+            check=True,
+            capture_output=True,
+            timeout=60,
+        )
+        git_status = subprocess.run(
+            ["git", "-C", base_path, "status", "--porcelain"],
+            capture_output=True,
+            text=True,
+            timeout=10,
+            check=False,
+        )
+        if git_status.stdout.strip():
+            committer = getattr(settings, "DEFAULT_COMMITER_NAME", "Weblate")
+            email = getattr(
+                settings,
+                "DEFAULT_COMMITER_EMAIL",
+                "noreply@weblate.org",
+            )
+            author = f"{committer} <{email}>"
+            subprocess.run(
+                [
+                    "git",
+                    "-C",
+                    base_path,
+                    "commit",
+                    "-m",
+                    f"Remove translation files for deleted component: {name}",
+                    "--author",
+                    author,
+                ],
+                check=True,
+                capture_output=True,
+                timeout=30,
+            )
+            committed = True
+            LOGGER.info("Committed deletion of translation files for: %s", name)
+            if push_url and push_branch:
+                subprocess.run(
+                    [
+                        "git",
+                        "-C",
+                        base_path,
+                        "push",
+                        "origin",
+                        f"HEAD:{push_branch}",
+                    ],
+                    check=True,
+                    capture_output=True,
+                    timeout=120,
+                )
+                LOGGER.info("Pushed to origin %s", push_branch)
+        return True, None, committed
+    except subprocess.CalledProcessError as e:
+        err = e.stderr or e
+        LOGGER.warning("Git commit/push failed for %s: %s", name, err)
+        return False, f"Git commit/push failed: {err}", committed
+    except subprocess.TimeoutExpired:
+        LOGGER.warning("Git commit/push timeout for %s", name)
+        return False, "Git commit/push timeout", committed
+
+
+def _git_restore_removed_files(
+    base_path: str,
+    rel_paths: list[str],
+    *,
+    committed: bool,
+) -> None:
+    """Restore removed translation files in the working tree after git failure."""
+    try:
+        if committed:
+            subprocess.run(
+                ["git", "-C", base_path, "reset", "--hard", "HEAD~1"],
+                check=True,
+                capture_output=True,
+                timeout=30,
+            )
+        else:
+            subprocess.run(
+                ["git", "-C", base_path, "checkout", "--", *rel_paths],
+                check=True,
+                capture_output=True,
+                timeout=30,
+            )
+    except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as e:
+        LOGGER.warning("Failed to restore translation files after git error: %s", e)
+
+
 def _build_extension_to_format() -> dict[str, str]:
     """Build extension -> format_id from Weblate FILE_FORMATS (internal API)."""
     result = {}
@@ -663,7 +768,10 @@ class BoostComponentService:
         self, component: Component, result: dict[str, Any]
     ) -> None:
         """
-        Delete component, remove its translation files from disk, commit and push.
+        Remove translation files, commit and push, then delete the component.
+
+        DB deletion is deferred until after git push succeeds so a failed push
+        does not leave the database inconsistent with the remote repository.
 
         Updates result["components_deleted"] and result["errors"] as needed.
         """
@@ -685,7 +793,6 @@ class BoostComponentService:
                 language=component.source_language
             )
         ]
-        component.delete()
 
         actually_removed = []
         for file_path in translation_files:
@@ -703,68 +810,21 @@ class BoostComponentService:
                     result["errors"].append(f"Failed to remove {file_path}: {e}")
 
         if actually_removed and os.path.isdir(os.path.join(base_path, ".git")):
-            try:
-                # Stage only the removed files (not all tracked changes)
-                rel_paths = [os.path.relpath(p, base_path) for p in actually_removed]
-                subprocess.run(
-                    ["git", "-C", base_path, "add", "--", *rel_paths],
-                    check=True,
-                    capture_output=True,
-                    timeout=60,
-                )
-                git_status = subprocess.run(
-                    ["git", "-C", base_path, "status", "--porcelain"],
-                    capture_output=True,
-                    text=True,
-                    timeout=10,
-                    check=False,
-                )
-                if git_status.stdout.strip():
-                    committer = getattr(settings, "DEFAULT_COMMITER_NAME", "Weblate")
-                    email = getattr(
-                        settings,
-                        "DEFAULT_COMMITER_EMAIL",
-                        "noreply@weblate.org",
-                    )
-                    author = f"{committer} <{email}>"
-                    subprocess.run(
-                        [
-                            "git",
-                            "-C",
-                            base_path,
-                            "commit",
-                            "-m",
-                            f"Remove translation files for deleted component: {name}",
-                            "--author",
-                            author,
-                        ],
-                        check=True,
-                        capture_output=True,
-                        timeout=30,
-                    )
-                    LOGGER.info("Committed deletion of translation files for: %s", name)
-                    if push_url and push_branch:
-                        # Push current branch to remote push_branch
-                        subprocess.run(
-                            [
-                                "git",
-                                "-C",
-                                base_path,
-                                "push",
-                                "origin",
-                                f"HEAD:{push_branch}",
-                            ],
-                            check=True,
-                            capture_output=True,
-                            timeout=120,
-                        )
-                        LOGGER.info("Pushed to origin %s", push_branch)
-            except subprocess.CalledProcessError as e:
-                LOGGER.warning("Git commit/push failed for %s: %s", name, e.stderr or e)
-                result["errors"].append(f"Git commit/push failed: {e.stderr or e}")
-            except subprocess.TimeoutExpired:
-                LOGGER.warning("Git commit/push timeout for %s", name)
-                result["errors"].append("Git commit/push timeout")
+            rel_paths = [os.path.relpath(p, base_path) for p in actually_removed]
+            ok, err, committed = _git_commit_and_push_removals(
+                base_path,
+                rel_paths,
+                name=name,
+                push_url=push_url,
+                push_branch=push_branch,
+            )
+            if not ok:
+                result["errors"].append(err or "Git commit/push failed")
+                _git_restore_removed_files(base_path, rel_paths, committed=committed)
+                return
+
+        with transaction.atomic():
+            component.delete()
 
         result["components_deleted"] += 1
         LOGGER.info("Deleted component (not in configs): %s", name)

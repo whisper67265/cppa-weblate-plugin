@@ -7,6 +7,7 @@ from __future__ import annotations
 import os
 import subprocess
 import tempfile
+from contextlib import nullcontext
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -759,10 +760,25 @@ class TestDeleteComponentAndCommitRemoval:
         component.translation_set.exclude.return_value = translations
         return component
 
+    def _git_success_side_effect(self):
+        mock_status = MagicMock()
+        mock_status.stdout = "D zh_Hans/intro.adoc\n"
+        return [MagicMock(), mock_status, MagicMock(), MagicMock()]
+
+    def _git_push_failure_side_effect(self):
+        mock_status = MagicMock()
+        mock_status.stdout = "D zh_Hans/intro.adoc\n"
+        err = subprocess.CalledProcessError(1, "git", stderr="push failed")
+        return [MagicMock(), mock_status, MagicMock(), err, MagicMock()]
+
     def test_increments_components_deleted(self) -> None:
         component = self._make_component()
         result = {"components_deleted": 0, "errors": []}
-        self.svc._delete_component_and_commit_removal(component, result)
+        with patch(
+            "boost_weblate.endpoint.services.transaction.atomic",
+            return_value=nullcontext(),
+        ):
+            self.svc._delete_component_and_commit_removal(component, result)
         assert result["components_deleted"] == 1
         component.delete.assert_called_once()
 
@@ -770,8 +786,13 @@ class TestDeleteComponentAndCommitRemoval:
         component = self._make_component(is_repo_link=True)
         component.linked_component = None
         result = {"components_deleted": 0, "errors": []}
-        self.svc._delete_component_and_commit_removal(component, result)
+        with patch(
+            "boost_weblate.endpoint.services.transaction.atomic",
+            return_value=nullcontext(),
+        ):
+            self.svc._delete_component_and_commit_removal(component, result)
         assert result["components_deleted"] == 1
+        component.delete.assert_called_once()
 
     def test_git_subprocess_called_when_files_removed(self) -> None:
         component = self._make_component(translation_files=["zh_Hans/intro.adoc"])
@@ -783,13 +804,38 @@ class TestDeleteComponentAndCommitRemoval:
             patch("os.path.isdir", return_value=True),
             patch("os.path.relpath", return_value="zh_Hans/intro.adoc"),
             patch("boost_weblate.endpoint.services.subprocess.run") as mock_run,
+            patch(
+                "boost_weblate.endpoint.services.transaction.atomic",
+                return_value=nullcontext(),
+            ),
         ):
-            mock_status = MagicMock()
-            mock_status.stdout = "D zh_Hans/intro.adoc\n"
-            mock_run.side_effect = [MagicMock(), mock_status, MagicMock(), MagicMock()]
+            mock_run.side_effect = self._git_success_side_effect()
             self.svc._delete_component_and_commit_removal(component, result)
 
         assert mock_run.called
+        component.delete.assert_called_once()
+
+    def test_push_success_deletes_component(self) -> None:
+        component = self._make_component(translation_files=["zh_Hans/intro.adoc"])
+        result = {"components_deleted": 0, "errors": []}
+
+        with (
+            patch("os.path.isfile", return_value=True),
+            patch("os.remove"),
+            patch("os.path.isdir", return_value=True),
+            patch("os.path.relpath", return_value="zh_Hans/intro.adoc"),
+            patch("boost_weblate.endpoint.services.subprocess.run") as mock_run,
+            patch(
+                "boost_weblate.endpoint.services.transaction.atomic",
+                return_value=nullcontext(),
+            ),
+        ):
+            mock_run.side_effect = self._git_success_side_effect()
+            self.svc._delete_component_and_commit_removal(component, result)
+
+        assert result["components_deleted"] == 1
+        assert result["errors"] == []
+        component.delete.assert_called_once()
 
     def test_subprocess_error_appended_to_errors(self) -> None:
         component = self._make_component(translation_files=["zh_Hans/intro.adoc"])
@@ -802,11 +848,31 @@ class TestDeleteComponentAndCommitRemoval:
             patch("os.path.relpath", return_value="zh_Hans/intro.adoc"),
             patch("boost_weblate.endpoint.services.subprocess.run") as mock_run,
         ):
-            err = subprocess.CalledProcessError(1, "git", stderr="push failed")
-            mock_run.side_effect = err
+            mock_run.side_effect = self._git_push_failure_side_effect()
             self.svc._delete_component_and_commit_removal(component, result)
 
         assert any("Git commit/push failed" in e for e in result["errors"])
+        assert result["components_deleted"] == 0
+        component.delete.assert_not_called()
+
+    def test_push_failure_restores_working_tree(self) -> None:
+        component = self._make_component(translation_files=["zh_Hans/intro.adoc"])
+        result = {"components_deleted": 0, "errors": []}
+
+        with (
+            patch("os.path.isfile", return_value=True),
+            patch("os.remove"),
+            patch("os.path.isdir", return_value=True),
+            patch("os.path.relpath", return_value="zh_Hans/intro.adoc"),
+            patch("boost_weblate.endpoint.services.subprocess.run") as mock_run,
+        ):
+            mock_run.side_effect = self._git_push_failure_side_effect()
+            self.svc._delete_component_and_commit_removal(component, result)
+
+        restore_call = mock_run.call_args_list[-1]
+        restore_args = restore_call.args[0]
+        assert restore_args[:4] == ["git", "-C", "/fake/path", "reset"]
+        assert restore_args[4:6] == ["--hard", "HEAD~1"]
 
     def test_subprocess_timeout_appended_to_errors(self) -> None:
         component = self._make_component(translation_files=["zh_Hans/intro.adoc"])
@@ -823,6 +889,8 @@ class TestDeleteComponentAndCommitRemoval:
             self.svc._delete_component_and_commit_removal(component, result)
 
         assert any("timeout" in e.lower() for e in result["errors"])
+        assert result["components_deleted"] == 0
+        component.delete.assert_not_called()
 
 
 # ---------------------------------------------------------------------------
