@@ -234,7 +234,6 @@ class BoostComponentService:
         self.lang_code = lang_code
         self.version = version
         self.extensions = extensions  # If None or empty, no filtering by extension list
-        self.temp_dir: str | None = None
         self._ext_to_format: dict[str, str] | None = None
 
     def get_extension_to_format(self) -> dict[str, str]:
@@ -830,12 +829,9 @@ class BoostComponentService:
         LOGGER.info("Deleted component (not in configs): %s", name)
 
     def process_submodule(
-        self, submodule: str, user=None, request=None
+        self, submodule: str, temp_dir: str, user=None, request=None
     ) -> dict[str, Any]:
         """Process a single submodule: clone, scan, create/update components."""
-        if self.temp_dir is None:
-            msg = "process_submodule requires temp_dir; call process_all() instead"
-            raise TypeError(msg)
         result: dict[str, Any] = {
             "submodule": submodule,
             "success": False,
@@ -847,9 +843,9 @@ class BoostComponentService:
         }
 
         # Create temp directory for this submodule
-        temp_submodule_dir = os.path.join(self.temp_dir, submodule)
+        temp_submodule_dir = os.path.join(temp_dir, submodule)
         resolved = Path(temp_submodule_dir).resolve()
-        temp_dir_resolved = Path(self.temp_dir).resolve()
+        temp_dir_resolved = Path(temp_dir).resolve()
         try:
             resolved.relative_to(temp_dir_resolved)
         except ValueError:
@@ -939,8 +935,8 @@ class BoostComponentService:
     ) -> dict[str, Any]:
         """Process all submodules."""
         # Create temp directory
-        self.temp_dir = tempfile.mkdtemp(prefix="boost_endpoint_")
-        LOGGER.info("Using temp directory: %s", self.temp_dir)
+        temp_dir = tempfile.mkdtemp(prefix="boost_endpoint_")
+        LOGGER.info("Using temp directory: %s", temp_dir)
 
         results: dict[str, Any] = {
             "total_submodules": len(submodules),
@@ -952,7 +948,9 @@ class BoostComponentService:
         try:
             for submodule in submodules:
                 LOGGER.info("Processing submodule: %s", submodule)
-                result = self.process_submodule(submodule, user=user, request=request)
+                result = self.process_submodule(
+                    submodule, temp_dir, user=user, request=request
+                )
                 results["submodule_results"].append(result)
 
                 if result["success"]:
@@ -962,8 +960,8 @@ class BoostComponentService:
 
         finally:
             # Cleanup temp directory
-            if self.temp_dir and os.path.exists(self.temp_dir):
-                shutil.rmtree(self.temp_dir, ignore_errors=True)
-                LOGGER.info("Cleaned up temp directory: %s", self.temp_dir)
+            if os.path.exists(temp_dir):
+                shutil.rmtree(temp_dir, ignore_errors=True)
+                LOGGER.info("Cleaned up temp directory: %s", temp_dir)
 
         return results

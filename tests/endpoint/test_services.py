@@ -4,6 +4,7 @@
 
 from __future__ import annotations
 
+import inspect
 import os
 import subprocess
 import tempfile
@@ -903,28 +904,29 @@ class TestProcessSubmodule:
         self.svc = _make_svc()
 
     def test_raises_typeerror_without_temp_dir(self) -> None:
-        with pytest.raises(TypeError, match="process_submodule requires temp_dir"):
+        sig = inspect.signature(self.svc.process_submodule)
+        assert sig.parameters["temp_dir"].default is inspect.Parameter.empty
+        with pytest.raises(
+            TypeError, match="missing .* required .* argument.*temp_dir"
+        ):
             self.svc.process_submodule("json")
 
     def test_clone_failure_returns_error_result(self, tmp_path) -> None:
-        self.svc.temp_dir = str(tmp_path)
         with patch.object(self.svc, "clone_repository", return_value=False):
-            result = self.svc.process_submodule("json")
+            result = self.svc.process_submodule("json", str(tmp_path))
         assert result["success"] is False
         assert any("clone" in e.lower() for e in result["errors"])
 
     def test_no_docs_found_returns_error(self, tmp_path) -> None:
-        self.svc.temp_dir = str(tmp_path)
         with (
             patch.object(self.svc, "clone_repository", return_value=True),
             patch.object(self.svc, "scan_documentation_files", return_value=[]),
         ):
-            result = self.svc.process_submodule("json")
+            result = self.svc.process_submodule("json", str(tmp_path))
         assert result["success"] is False
         assert any("no supported" in e.lower() for e in result["errors"])
 
     def test_permission_denied_project_add(self, tmp_path) -> None:
-        self.svc.temp_dir = str(tmp_path)
         user = MagicMock()
         user.has_perm.return_value = False
         request = MagicMock()
@@ -936,13 +938,14 @@ class TestProcessSubmodule:
             patch("boost_weblate.endpoint.services.Project") as MockProject,
         ):
             MockProject.objects.filter.return_value.first.return_value = None
-            result = self.svc.process_submodule("json", user=user, request=request)
+            result = self.svc.process_submodule(
+                "json", str(tmp_path), user=user, request=request
+            )
 
         assert result["success"] is False
         assert any("project.add" in e for e in result["errors"])
 
     def test_permission_denied_project_edit(self, tmp_path) -> None:
-        self.svc.temp_dir = str(tmp_path)
         user = MagicMock()
         user.has_perm.side_effect = lambda perm, *args: False
         request = MagicMock()
@@ -957,13 +960,14 @@ class TestProcessSubmodule:
             MockProject.objects.filter.return_value.first.return_value = (
                 existing_project
             )
-            result = self.svc.process_submodule("json", user=user, request=request)
+            result = self.svc.process_submodule(
+                "json", str(tmp_path), user=user, request=request
+            )
 
         assert result["success"] is False
         assert any("project.edit" in e for e in result["errors"])
 
     def test_get_or_create_project_exception(self, tmp_path) -> None:
-        self.svc.temp_dir = str(tmp_path)
         configs = [{"component_slug": "x"}]
 
         with (
@@ -976,13 +980,12 @@ class TestProcessSubmodule:
             patch("boost_weblate.endpoint.services.report_error"),
         ):
             MockProject.objects.filter.return_value.first.return_value = None
-            result = self.svc.process_submodule("json")
+            result = self.svc.process_submodule("json", str(tmp_path))
 
         assert result["success"] is False
         assert any("Failed to create project" in e for e in result["errors"])
 
     def test_successful_submodule_creates_component(self, tmp_path) -> None:
-        self.svc.temp_dir = str(tmp_path)
         project = MagicMock()
         project.component_set.all.return_value = []
         component = MagicMock()
@@ -1007,14 +1010,13 @@ class TestProcessSubmodule:
             patch("boost_weblate.endpoint.services.Project") as MockProject,
         ):
             MockProject.objects.filter.return_value.first.return_value = None
-            result = self.svc.process_submodule("json")
+            result = self.svc.process_submodule("json", str(tmp_path))
 
         assert result["success"] is True
         assert result["components_created"] == 1
 
     def test_invalid_submodule_name_path_traversal(self, tmp_path) -> None:
-        self.svc.temp_dir = str(tmp_path)
-        result = self.svc.process_submodule("../evil")
+        result = self.svc.process_submodule("../evil", str(tmp_path))
         assert result["success"] is False
         assert any("Invalid submodule" in e for e in result["errors"])
 
@@ -1065,7 +1067,7 @@ class TestProcessAll:
         captured_dir = []
 
         def recording_process_submodule(*args, **kwargs):
-            captured_dir.append(svc.temp_dir)
+            captured_dir.append(kwargs.get("temp_dir", args[1]))
             return {
                 "submodule": args[0],
                 "success": True,
@@ -1088,7 +1090,7 @@ class TestProcessAll:
         svc = _make_svc()
         call_count = [0]
 
-        def mock_process_submodule(sub, user=None, request=None):
+        def mock_process_submodule(sub, temp_dir, user=None, request=None):
             call_count[0] += 1
             success = call_count[0] % 2 == 0  # even calls succeed
             return {
