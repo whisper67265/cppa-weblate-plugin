@@ -10,7 +10,13 @@ from typing import Any
 
 from weblate.auth.models import AuthenticatedHttpRequest, User
 from weblate.utils.celery import app
+from weblate.utils.errors import report_error
 
+from boost_weblate.endpoint.errors import (
+    BoostEndpointError,
+    BoostEndpointErrorCode,
+    wrap_task_error,
+)
 from boost_weblate.endpoint.services import BoostComponentService
 
 
@@ -26,19 +32,36 @@ def boost_add_or_update_task(
     """
     Run BoostComponentService for each language (same logic as synchronous POST).
 
-    Exceptions propagate so Celery marks the task failed and monitoring can alert.
+    Fatal failures raise BoostEndpointError (WeblateError subclass) so Celery
+    marks the task failed with a typed, code-bearing exception for monitoring.
     """
-    user = User.objects.get(pk=user_id)
+    try:
+        user = User.objects.get(pk=user_id)
+    except User.DoesNotExist as exc:
+        raise BoostEndpointError(
+            f"User {user_id} not found",
+            code=BoostEndpointErrorCode.TASK_USER_NOT_FOUND,
+            metadata={"user_id": user_id},
+        ) from exc
+
     request = AuthenticatedHttpRequest()
     request.user = user
 
-    results: dict[str, Any] = {}
-    for lang_code, submodules in add_or_update.items():
-        service = BoostComponentService(
-            organization=organization,
-            lang_code=lang_code,
-            version=version,
-            extensions=extensions,
-        )
-        results[lang_code] = service.process_all(submodules, user=user, request=request)
-    return results
+    try:
+        results: dict[str, Any] = {}
+        for lang_code, submodules in add_or_update.items():
+            service = BoostComponentService(
+                organization=organization,
+                lang_code=lang_code,
+                version=version,
+                extensions=extensions,
+            )
+            results[lang_code] = service.process_all(
+                submodules, user=user, request=request
+            )
+        return results
+    except BoostEndpointError:
+        raise
+    except Exception as exc:
+        report_error(cause="Boost add-or-update task")
+        raise wrap_task_error(exc) from exc

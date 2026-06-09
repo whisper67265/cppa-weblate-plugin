@@ -45,6 +45,12 @@ from weblate.trans.models import Component, Project
 from weblate.utils.errors import report_error
 from weblate.vcs.base import RepositoryError
 
+from boost_weblate.endpoint.errors import (
+    BoostEndpointErrorCode,
+    append_error,
+    to_error_dict,
+)
+
 if TYPE_CHECKING:
     from weblate.lang.models import LanguageQuerySet
 
@@ -107,11 +113,11 @@ def _git_commit_and_push_removals(
     name: str,
     push_url: str | None,
     push_branch: str | None,
-) -> tuple[bool, str | None, bool]:
+) -> tuple[bool, dict[str, Any] | None, bool]:
     """
     Stage removed files, commit, and optionally push.
 
-    Returns (success, error_message, committed). ``committed`` is True when a
+    Returns (success, error_dict, committed). ``committed`` is True when a
     local commit was created (used to choose rollback strategy on push failure).
     """
     committed = False
@@ -173,10 +179,30 @@ def _git_commit_and_push_removals(
     except subprocess.CalledProcessError as e:
         err = e.stderr or e
         LOGGER.warning("Git commit/push failed for %s: %s", name, err)
-        return False, f"Git commit/push failed: {err}", committed
-    except subprocess.TimeoutExpired:
+        stderr = err.decode(errors="replace") if isinstance(err, bytes) else str(err)
+        return (
+            False,
+            to_error_dict(
+                BoostEndpointErrorCode.GIT_PUSH_FAILED,
+                f"Git commit/push failed: {stderr}",
+                component_name=name,
+                stderr=stderr[:500],
+            ),
+            committed,
+        )
+    except subprocess.TimeoutExpired as e:
         LOGGER.warning("Git commit/push timeout for %s", name)
-        return False, "Git commit/push timeout", committed
+        timeout = e.timeout if e.timeout is not None else 0
+        return (
+            False,
+            to_error_dict(
+                BoostEndpointErrorCode.GIT_PUSH_TIMEOUT,
+                "Git commit/push timeout",
+                component_name=name,
+                timeout_seconds=timeout,
+            ),
+            committed,
+        )
 
 
 def _git_restore_removed_files(
@@ -806,7 +832,13 @@ class BoostComponentService:
                         file_path,
                         e,
                     )
-                    result["errors"].append(f"Failed to remove {file_path}: {e}")
+                    result["errors"].append(
+                        to_error_dict(
+                            BoostEndpointErrorCode.FILE_REMOVE_FAILED,
+                            f"Failed to remove {file_path}: {e}",
+                            file_path=file_path,
+                        )
+                    )
 
         if actually_removed and os.path.isdir(os.path.join(base_path, ".git")):
             rel_paths = [os.path.relpath(p, base_path) for p in actually_removed]
@@ -818,7 +850,14 @@ class BoostComponentService:
                 push_branch=push_branch,
             )
             if not ok:
-                result["errors"].append(err or "Git commit/push failed")
+                result["errors"].append(
+                    err
+                    or to_error_dict(
+                        BoostEndpointErrorCode.GIT_PUSH_FAILED,
+                        "Git commit/push failed",
+                        component_name=name,
+                    )
+                )
                 _git_restore_removed_files(base_path, rel_paths, committed=committed)
                 return
 
@@ -849,7 +888,12 @@ class BoostComponentService:
         try:
             resolved.relative_to(temp_dir_resolved)
         except ValueError:
-            result["errors"].append(f"Invalid submodule name: {submodule}")
+            append_error(
+                result,
+                BoostEndpointErrorCode.INVALID_SUBMODULE,
+                f"Invalid submodule name: {submodule}",
+                submodule=submodule,
+            )
             return result
         os.makedirs(temp_submodule_dir, exist_ok=True)
 
@@ -857,14 +901,24 @@ class BoostComponentService:
         if not self.clone_repository(
             submodule, temp_submodule_dir, f"local-{self.lang_code}"
         ):
-            result["errors"].append(f"Failed to clone repository for {submodule}")
+            append_error(
+                result,
+                BoostEndpointErrorCode.CLONE_FAILED,
+                f"Failed to clone repository for {submodule}",
+                submodule=submodule,
+                organization=self.organization,
+                lang_code=self.lang_code,
+            )
             return result
 
         # Scan for documentation files
         configs = self.scan_documentation_files(temp_submodule_dir)
         if not configs:
-            result["errors"].append(
-                f"No supported documentation files found in {submodule}"
+            append_error(
+                result,
+                BoostEndpointErrorCode.NO_DOCUMENTATION_FILES,
+                f"No supported documentation files found in {submodule}",
+                submodule=submodule,
             )
             return result
 
@@ -877,19 +931,35 @@ class BoostComponentService:
         if request is not None and user is not None:
             if existing_project is not None:
                 if not user.has_perm("project.edit", existing_project):
-                    result["errors"].append(
-                        "Can not create components (missing project.edit)"
+                    append_error(
+                        result,
+                        BoostEndpointErrorCode.PERMISSION_DENIED,
+                        "Can not create components (missing project.edit)",
+                        permission="project.edit",
+                        project_slug=project_slug,
                     )
                     return result
             elif not user.has_perm("project.add"):
-                result["errors"].append("Can not create project (missing project.add)")
+                append_error(
+                    result,
+                    BoostEndpointErrorCode.PERMISSION_DENIED,
+                    "Can not create project (missing project.add)",
+                    permission="project.add",
+                    project_slug=project_slug,
+                )
                 return result
 
         # Get or create project
         try:
             project = self.get_or_create_project(submodule, user)
         except Exception as e:
-            result["errors"].append(f"Failed to create project: {e}")
+            append_error(
+                result,
+                BoostEndpointErrorCode.PROJECT_CREATE_FAILED,
+                f"Failed to create project: {e}",
+                submodule=submodule,
+                exception_type=type(e).__name__,
+            )
             report_error(cause="Project creation")
             return result
 
@@ -917,16 +987,25 @@ class BoostComponentService:
                     LOGGER.warning(
                         "Failed to delete component %s: %s", component.slug, e
                     )
-                    result["errors"].append(f"Failed to delete {component.slug}: {e}")
+                    append_error(
+                        result,
+                        BoostEndpointErrorCode.COMPONENT_DELETE_FAILED,
+                        f"Failed to delete {component.slug}: {e}",
+                        component_slug=component.slug,
+                        exception_type=type(e).__name__,
+                    )
 
         any_component_ok = (
             result["components_created"] + result["components_updated"]
         ) > 0
         result["success"] = any_component_ok
         if not any_component_ok and result["components_failed"]:
-            result["errors"].append(
+            append_error(
+                result,
+                BoostEndpointErrorCode.ALL_COMPONENTS_FAILED,
                 "Failed to create or update every scanned component "
-                f"({result['components_failed']} config(s))"
+                f"({result['components_failed']} config(s))",
+                components_failed=result["components_failed"],
             )
         return result
 

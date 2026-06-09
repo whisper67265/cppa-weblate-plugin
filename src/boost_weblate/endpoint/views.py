@@ -88,7 +88,7 @@ class AddOrUpdateView(APIView):
         serializer = AddOrUpdateRequestSerializer(data=request.data)
         if not serializer.is_valid():
             return Response(
-                {"errors": serializer.errors},
+                {"errors": serializer.structured_errors},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 

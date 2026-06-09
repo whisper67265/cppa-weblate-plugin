@@ -10,6 +10,12 @@ from typing import Any
 
 from rest_framework import serializers
 
+from boost_weblate.endpoint.errors import (
+    BoostEndpointErrorCode,
+    boost_validation_errors,
+    to_error_dict,
+)
+
 
 class AddOrUpdateRequestSerializer(serializers.Serializer):
     """Serializer for add_or_update endpoint request."""
@@ -44,6 +50,77 @@ class AddOrUpdateRequestSerializer(serializers.Serializer):
         ),
     )
 
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        self._custom_validation_errors: list[dict[str, Any]] = []
+        self._structured_errors: list[dict[str, Any]] = []
+
+    @property
+    def structured_errors(self) -> list[dict[str, Any]]:
+        return self._structured_errors
+
+    def is_valid(self, *, raise_exception: bool = False) -> bool:
+        self._custom_validation_errors = []
+        valid = super().is_valid(raise_exception=False)
+        if not valid:
+            self._structured_errors = self._to_structured_errors()
+        else:
+            self._structured_errors = []
+        if not valid and raise_exception:
+            raise serializers.ValidationError(self._structured_errors)
+        return valid
+
+    def _to_structured_errors(self) -> list[dict[str, Any]]:
+        structured = list(self._custom_validation_errors)
+        for field, messages in self.errors.items():
+            if field == "add_or_update" and self._custom_validation_errors:
+                continue
+            for subfield, message in self._flatten_field_errors(field, messages):
+                code = self._code_for_drf_error(field, message)
+                metadata: dict[str, Any] = {"field": field}
+                if subfield and field == "add_or_update":
+                    metadata["language"] = subfield
+                structured.append(to_error_dict(code, message, **metadata))
+        return structured
+
+    @staticmethod
+    def _flatten_field_errors(
+        field: str, messages: Any
+    ) -> list[tuple[str | None, str]]:
+        """Flatten nested DRF ErrorDict structures into (subfield, message) pairs."""
+        results: list[tuple[str | None, str]] = []
+        if isinstance(messages, dict) or hasattr(messages, "items"):
+            for key, value in messages.items():
+                key_str = str(key)
+                if isinstance(value, (list, tuple)):
+                    for msg in value:
+                        if isinstance(msg, (dict,)) or hasattr(msg, "items"):
+                            results.extend(
+                                AddOrUpdateRequestSerializer._flatten_field_errors(
+                                    field, msg
+                                )
+                            )
+                        else:
+                            results.append((key_str, str(msg)))
+                elif isinstance(value, (dict,)) or hasattr(value, "items"):
+                    nested = AddOrUpdateRequestSerializer._flatten_field_errors(
+                        field, value
+                    )
+                    results.extend((key_str, msg) for _sub, msg in nested)
+                else:
+                    results.append((key_str, str(value)))
+        else:
+            for msg in messages:
+                results.append((None, str(msg)))
+        return results
+
+    @staticmethod
+    def _code_for_drf_error(field: str, message: str) -> BoostEndpointErrorCode:
+        lower = message.lower()
+        if field == "add_or_update" and ("list" in lower or "not a valid" in lower):
+            return BoostEndpointErrorCode.INVALID_SUBMODULE_LIST
+        return BoostEndpointErrorCode.REQUIRED_FIELD
+
     def validate_extensions(self, value: list[str] | None) -> list[str] | None:
         """Strip entries and remove blanks so all-empty input does not filter files."""
         if value is None:
@@ -52,25 +129,44 @@ class AddOrUpdateRequestSerializer(serializers.Serializer):
 
     def validate_add_or_update(self, value: dict[str, Any]) -> dict[str, Any]:
         """Require non-empty string language keys and non-empty submodule lists."""
-        errors: dict[str, str] = {}
+        items: list[tuple[BoostEndpointErrorCode, str, dict[str, Any]]] = []
         for lang_code, submodules in value.items():
             if not isinstance(lang_code, str) or lang_code.strip() == "":
-                errors[str(lang_code)] = (
-                    "add_or_update: each key must be a non-empty language code; "
-                    f"got {repr(lang_code)}"
+                items.append(
+                    (
+                        BoostEndpointErrorCode.INVALID_LANGUAGE_CODE,
+                        (
+                            "add_or_update: each key must be a non-empty language "
+                            f"code; got {repr(lang_code)}"
+                        ),
+                        {"field": "add_or_update", "language": str(lang_code)},
+                    )
                 )
                 continue
             if not isinstance(submodules, list):
-                errors[str(lang_code)] = (
-                    "add_or_update: each value must be a non-empty list of submodule "
-                    f"names; key {lang_code!r} is not a list "
-                    f"(got {type(submodules).__name__})."
+                items.append(
+                    (
+                        BoostEndpointErrorCode.INVALID_SUBMODULE_LIST,
+                        (
+                            "add_or_update: each value must be a non-empty list of "
+                            f"submodule names; key {lang_code!r} is not a list "
+                            f"(got {type(submodules).__name__})."
+                        ),
+                        {"field": "add_or_update", "language": lang_code},
+                    )
                 )
             elif len(submodules) == 0:
-                errors[str(lang_code)] = (
-                    "add_or_update: each value must be a non-empty list of submodule "
-                    f"names; key {lang_code!r} has an empty list."
+                items.append(
+                    (
+                        BoostEndpointErrorCode.INVALID_SUBMODULE_LIST,
+                        (
+                            "add_or_update: each value must be a non-empty list of "
+                            f"submodule names; key {lang_code!r} has an empty list."
+                        ),
+                        {"field": "add_or_update", "language": lang_code},
+                    )
                 )
-        if errors:
-            raise serializers.ValidationError(errors)
+        if items:
+            self._custom_validation_errors = boost_validation_errors(items)
+            raise serializers.ValidationError({"add_or_update": "invalid"})
         return value

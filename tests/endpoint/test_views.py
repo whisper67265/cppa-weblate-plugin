@@ -20,6 +20,10 @@ from rest_framework.settings import api_settings
 from rest_framework.test import APIRequestFactory, force_authenticate
 from rest_framework.throttling import SimpleRateThrottle
 
+from boost_weblate.endpoint.errors import (
+    BoostEndpointError,
+    BoostEndpointErrorCode,
+)
 from boost_weblate.endpoint.views import (
     AddOrUpdateView,
     BoostEndpointInfo,
@@ -146,6 +150,10 @@ def test_add_or_update_validation_error() -> None:
     response = AddOrUpdateView.as_view()(request)
     assert response.status_code == status.HTTP_400_BAD_REQUEST
     assert "errors" in response.data
+    errors = response.data["errors"]
+    assert isinstance(errors, list)
+    assert all("code" in e and "message" in e and "metadata" in e for e in errors)
+    assert BoostEndpointErrorCode.REQUIRED_FIELD.value in [e["code"] for e in errors]
 
 
 def test_add_or_update_accepts_and_enqueues_like_boost_weblate(
@@ -256,7 +264,7 @@ def test_boost_add_or_update_task_propagates_service_errors(
 
     monkeypatch.setattr(tasks_mod, "BoostComponentService", BoomService)
 
-    with pytest.raises(RuntimeError, match="fail"):
+    with pytest.raises(BoostEndpointError) as exc_info:
         tasks_mod.boost_add_or_update_task.run(
             organization="o",
             add_or_update={"en": ["x"]},
@@ -264,6 +272,7 @@ def test_boost_add_or_update_task_propagates_service_errors(
             extensions=None,
             user_id=1,
         )
+    assert exc_info.value.code == BoostEndpointErrorCode.TASK_INTERNAL_ERROR
 
 
 def test_boost_endpoint_info_returns_429_when_scoped_throttled(
