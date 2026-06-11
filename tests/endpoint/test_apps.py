@@ -9,6 +9,14 @@ import builtins
 import pytest
 
 from boost_weblate.endpoint import apps
+from boost_weblate.endpoint.weblate_urls_adapter import register_boost_endpoint_urls
+
+
+@pytest.fixture(autouse=True)
+def _clear_cache() -> None:
+    register_boost_endpoint_urls.cache_clear()
+    yield
+    register_boost_endpoint_urls.cache_clear()
 
 
 def test_register_plugin_urls_delegates_to_adapter(

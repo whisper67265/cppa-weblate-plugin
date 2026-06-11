@@ -12,7 +12,7 @@ from functools import lru_cache
 from types import ModuleType
 
 from django.urls import URLResolver, include, path
-from packaging.version import Version
+from packaging.version import InvalidVersion, Version
 
 logger = logging.getLogger(__name__)
 
@@ -46,7 +46,21 @@ def _assert_weblate_url_layout(wl_urls: ModuleType) -> None:
             f"Weblate {version} URL layout is incompatible with cppa-weblate-plugin"
         )
         raise WeblateUrlLayoutError(msg)
-    if Version(version) < _MIN_WEBLATE_VERSION:
+    if version == "unknown":
+        msg = (
+            "Weblate package version could not be determined; "
+            "cppa-weblate-plugin cannot verify minimum version compatibility"
+        )
+        raise WeblateUrlLayoutError(msg)
+    try:
+        parsed = Version(version)
+    except InvalidVersion as exc:
+        msg = (
+            f"Weblate version string {version!r} could not be parsed; "
+            "cppa-weblate-plugin cannot verify minimum version compatibility"
+        )
+        raise WeblateUrlLayoutError(msg) from exc
+    if parsed < _MIN_WEBLATE_VERSION:
         msg = (
             f"Weblate {version} is below the minimum supported version "
             f"{_MIN_WEBLATE_VERSION}; cppa-weblate-plugin requires Weblate "
@@ -77,6 +91,10 @@ def register_boost_endpoint_urls() -> None:
     before the ``URL_PREFIX`` wrapper keeps routes under prefix configuration.
 
     Idempotent via ``lru_cache``; safe to call from ``AppConfig.ready()``.
+
+    Note: if ``weblate.urls`` is not importable at call time, the no-op result
+    is still cached; retrying after the module becomes importable requires an
+    explicit ``register_boost_endpoint_urls.cache_clear()`` call.
     """
     try:
         import weblate.urls as wl_urls  # noqa: PLC0415

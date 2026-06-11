@@ -10,6 +10,7 @@ import sys
 import types
 
 import pytest
+from django.conf import settings
 from django.urls import URLResolver
 
 from boost_weblate.endpoint.weblate_urls_adapter import (
@@ -43,6 +44,19 @@ def test_assert_layout_raises_when_real_patterns_not_list() -> None:
     fake = types.ModuleType("weblate.urls")
     fake.real_patterns = ()
     with pytest.raises(WeblateUrlLayoutError, match="not a list"):
+        _assert_weblate_url_layout(fake)
+
+
+def test_assert_layout_raises_when_weblate_version_unknown(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fake = types.ModuleType("weblate.urls")
+    fake.real_patterns = []
+    monkeypatch.setattr(
+        "boost_weblate.endpoint.weblate_urls_adapter._weblate_version",
+        lambda: "unknown",
+    )
+    with pytest.raises(WeblateUrlLayoutError, match="version"):
         _assert_weblate_url_layout(fake)
 
 
@@ -148,6 +162,10 @@ def test_register_skips_duplicate_after_cache_clear(
     assert len(fake.real_patterns) == 1
 
 
+@pytest.mark.skipif(
+    settings.ROOT_URLCONF != "weblate.urls",
+    reason="requires Weblate ROOT_URLCONF (weblate.urls)",
+)
 def test_plugin_ping_resolves_after_registration() -> None:
     from django.urls import resolve
 

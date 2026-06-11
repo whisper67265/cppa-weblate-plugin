@@ -697,6 +697,7 @@ wheels = [
 
 [[package]]
 dependencies = [
+  {name = "packaging"},
   {name = "weblate", extra = ["all"]}
 ]
 name = "cppa-weblate-plugin"
@@ -730,6 +731,7 @@ tooling = [
 provides-extras = ["dev"]
 requires-dist = [
   {name = "coverage", extras = ["toml"], marker = "extra == 'dev'", specifier = "==7.14.1"},
+  {name = "packaging", specifier = "==26.2"},
   {name = "prek", marker = "extra == 'dev'", specifier = "==0.4.4"},
   {name = "pytest", marker = "extra == 'dev'", specifier = "==9.0.3"},
   {name = "pytest-cov", marker = "extra == 'dev'", specifier = "==7.1.0"},
