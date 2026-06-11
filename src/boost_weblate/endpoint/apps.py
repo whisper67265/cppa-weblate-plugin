@@ -4,58 +4,26 @@
 
 from __future__ import annotations
 
-import logging
-
 from django.apps import AppConfig
-from django.urls import include, path
 
-logger = logging.getLogger(__name__)
-
-_PLUGIN_URLS_ATTR = "_cppa_boost_weblate_urls_registered"
+from boost_weblate.endpoint.weblate_urls_adapter import register_boost_endpoint_urls
 
 
 def register_plugin_urls() -> None:
-    """Append this app's routes to Weblate's pattern list.
+    """Register Boost endpoint routes with Weblate.
 
-    This is the supported plugin path: at process
-    startup, append a single ``path("boost-endpoint/", ...)`` entry to
-    ``weblate.urls.real_patterns`` so routes stay under Weblate's ``URL_PREFIX``
-    handling.
+    Delegates to
+    :func:`~boost_weblate.endpoint.weblate_urls_adapter.register_boost_endpoint_urls`,
+    which appends a single ``path("boost-endpoint/", ...)`` entry to
+    ``weblate.urls.real_patterns`` after fail-fast layout checks.
 
     Exposed HTTP paths (relative to ``/boost-endpoint/``): ``info/``,
     ``add-or-update/``, and ``plugin-ping/`` (see ``boost_weblate.endpoint.urls``).
 
-    Weblate builds ``urlpatterns`` from module-level ``real_patterns`` (see
-    ``weblate.urls``). Optional plugins append to ``real_patterns`` before
-    the ``URL_PREFIX`` wrapper is applied, so mutating that list keeps routes
-    consistent when a path prefix is configured.
+    Raises :class:`~boost_weblate.endpoint.weblate_urls_adapter.WeblateUrlLayoutError`
+    when Weblate's URL module layout is incompatible.
     """
-    try:
-        import weblate.urls as wl_urls  # noqa: PLC0415
-    except ModuleNotFoundError as exc:
-        logger.debug(
-            "boost_weblate.endpoint: skipping URL registration (import error: %s)",
-            exc,
-        )
-        return
-
-    if getattr(wl_urls, _PLUGIN_URLS_ATTR, False):
-        return
-
-    if not hasattr(wl_urls, "real_patterns"):
-        logger.warning(
-            "boost_weblate.endpoint: weblate.urls has no real_patterns; "
-            "URL registration skipped (unexpected Weblate layout)."
-        )
-        return
-
-    wl_urls.real_patterns.append(
-        path(
-            "boost-endpoint/",
-            include(("boost_weblate.endpoint.urls", "boost_endpoint")),
-        ),
-    )
-    setattr(wl_urls, _PLUGIN_URLS_ATTR, True)
+    register_boost_endpoint_urls()
 
 
 class BoostEndpointConfig(AppConfig):

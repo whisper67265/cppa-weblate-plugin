@@ -154,18 +154,9 @@ When `WEBLATE_URL_PREFIX` is set (e.g. `/weblate`), all paths are prefixed accor
 
 Weblate's `urls.py` does **not** auto-discover URLconfs from arbitrary `INSTALLED_APPS` entries. It builds a single `real_patterns` list by hand and only extends it for known built-in apps (legal, SAML, git-export, etc.) via explicit `if "app" in settings.INSTALLED_APPS:` guards — there is no generic plugin scan.
 
-This plugin handles registration in `BoostEndpointConfig.ready()` (`src/boost_weblate/endpoint/apps.py`), which runs once at Django startup and appends to `weblate.urls.real_patterns`:
+This plugin handles registration in `BoostEndpointConfig.ready()` (`src/boost_weblate/endpoint/apps.py`), which delegates to `register_boost_endpoint_urls()` in `src/boost_weblate/endpoint/weblate_urls_adapter.py`. That adapter appends to `weblate.urls.real_patterns` after fail-fast layout checks (raises `WeblateUrlLayoutError` if `real_patterns` is missing or Weblate is below the supported version).
 
-```python
-wl_urls.real_patterns.append(
-    path(
-        "boost-endpoint/",
-        include(("boost_weblate.endpoint.urls", "boost_endpoint")),
-    ),
-)
-```
-
-The operation is idempotent (guarded by a `_cppa_boost_weblate_urls_registered` attribute on the module). Routes sit under Weblate's `URL_PREFIX` handling because `real_patterns` is used before the prefix wrapper is applied.
+Registration is idempotent via `functools.lru_cache` on the adapter function (not a sentinel on Weblate's module). Routes sit under Weblate's `URL_PREFIX` handling because `real_patterns` is used before the prefix wrapper is applied.
 
 ### Request / response for `POST /boost-endpoint/add-or-update/`
 

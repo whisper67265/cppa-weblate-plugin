@@ -29,18 +29,9 @@ The Boost Endpoint is the HTTP API surface of this plugin. It provides three rou
 
 Adding the app to `INSTALLED_APPS` is required but not sufficient for routes to be active. Weblate's `urls.py` builds its route list by hand (`real_patterns`) and does not auto-discover URLconfs from arbitrary apps.
 
-`BoostEndpointConfig.ready()` (`src/boost_weblate/endpoint/apps.py`) appends to `weblate.urls.real_patterns` at Django startup:
+`BoostEndpointConfig.ready()` (`src/boost_weblate/endpoint/apps.py`) delegates to `register_boost_endpoint_urls()` in `src/boost_weblate/endpoint/weblate_urls_adapter.py`, which appends to `weblate.urls.real_patterns` at Django startup after verifying Weblate's URL layout (raises `WeblateUrlLayoutError` on incompatibility).
 
-```python
-wl_urls.real_patterns.append(
-    path(
-        "boost-endpoint/",
-        include(("boost_weblate.endpoint.urls", "boost_endpoint")),
-    ),
-)
-```
-
-This is idempotent — a module-level flag (`_cppa_boost_weblate_urls_registered`) prevents double-registration. The routes inherit Weblate's `URL_PREFIX` handling because `real_patterns` is processed before the prefix wrapper is applied.
+Registration is idempotent via `functools.lru_cache` on the adapter. The routes inherit Weblate's `URL_PREFIX` handling because `real_patterns` is processed before the prefix wrapper is applied.
 
 For `INSTALLED_APPS` registration, use `settings_override.py` (recommended) or the `WEBLATE_ADD_APPS` Docker environment variable — **not both**. See the main [README](../README.md#weblate_add_apps) for the full comparison.
 

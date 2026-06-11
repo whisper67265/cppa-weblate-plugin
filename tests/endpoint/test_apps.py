@@ -5,12 +5,28 @@
 from __future__ import annotations
 
 import builtins
-import sys
-import types
 
 import pytest
 
-from boost_weblate.endpoint.apps import register_plugin_urls
+from boost_weblate.endpoint import apps
+
+
+def test_register_plugin_urls_delegates_to_adapter(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    called = False
+
+    def fake_register() -> None:
+        nonlocal called
+        called = True
+
+    monkeypatch.setattr(
+        apps,
+        "register_boost_endpoint_urls",
+        fake_register,
+    )
+    apps.register_plugin_urls()
+    assert called is True
 
 
 def test_register_plugin_urls_skips_when_weblate_urls_missing(
@@ -24,25 +40,4 @@ def test_register_plugin_urls_skips_when_weblate_urls_missing(
         return real_import(name, *args, **kwargs)
 
     monkeypatch.setattr(builtins, "__import__", fake_import)
-    # Should not raise; no fake module to inspect.
-    register_plugin_urls()
-
-
-def test_register_plugin_urls_skips_without_real_patterns(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    fake = types.ModuleType("weblate.urls")
-    monkeypatch.setitem(sys.modules, "weblate.urls", fake)
-    register_plugin_urls()
-    assert not hasattr(fake, "real_patterns")
-
-
-def test_register_plugin_urls_appends_once(monkeypatch: pytest.MonkeyPatch) -> None:
-    fake = types.ModuleType("weblate.urls")
-    fake.real_patterns = []
-    monkeypatch.setitem(sys.modules, "weblate.urls", fake)
-
-    register_plugin_urls()
-    register_plugin_urls()
-
-    assert len(fake.real_patterns) == 1
+    apps.register_plugin_urls()
