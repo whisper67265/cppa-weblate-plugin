@@ -9,13 +9,12 @@ Weblate's official image runs this file with ``exec()`` in the same namespace as
 ``/app/data/settings-override.py`` (hyphen on disk) or keep it on ``PYTHONPATH`` and
 point your image at the same content.
 
-``WEBLATE_FORMATS`` is built by **reading** ``weblate/formats/models.py`` as text and
-regex-slicing ``FormatsConf.FORMATS``. That avoids ``import weblate.formats.models``,
+``WEBLATE_FORMATS`` is built by **reading** ``weblate/formats/models.py`` and
+AST-parsing ``FormatsConf.FORMATS``. That avoids ``import weblate.formats.models``,
 which pulls in Django ORM classes during settings import and raises
-``AppRegistryNotReady``. The slice is **layout-sensitive**: it assumes ``FORMATS = (``
-inside ``FormatsConf`` (same file) is followed by ``class Meta:`` at the same indent;
-if upstream reformats ``FormatsConf`` or moves ``FORMATS`` / ``Meta``, update
-``_FORMATS_BLOCK`` below.
+``AppRegistryNotReady``. If upstream restructures ``FormatsConf`` (e.g. renames the
+class or moves ``FORMATS`` off a simple tuple assignment), update the AST helpers
+below.
 
 When this file is ``exec``'d into Weblate's settings namespace (Docker),
 ``INSTALLED_APPS`` is taken from ``globals()`` and extended. Upstream
@@ -28,8 +27,8 @@ back to ``globals()["INSTALLED_APPS"]``. Importing this module without
 
 from __future__ import annotations
 
+import ast
 import os
-import re
 from pathlib import Path
 from typing import Any
 
@@ -39,11 +38,39 @@ import weblate.formats
 _QUICKBOOK_FORMAT = "boost_weblate.formats.quickbook.QuickBookFormat"
 _ENDPOINT_APP_CONFIG = "boost_weblate.endpoint.apps.BoostEndpointConfig"
 
-_FORMATS_BLOCK = re.compile(
-    r"^\s{4}FORMATS\s*=\s*\(([\s\S]*?)\)\s*\n\s{4}class Meta:",
-    re.MULTILINE,
-)
-_STRING_LITERAL = re.compile(r'"([^"\\]*)"(?:\s*,|\s*$)', re.MULTILINE)
+
+def _parse_formatsconf_formats_ast(models_text: str) -> list[str]:
+    tree = ast.parse(models_text)
+    for node in tree.body:
+        if isinstance(node, ast.ClassDef) and node.name == "FormatsConf":
+            return _formats_assignment_to_strings(node.body)
+    msg = "Class FormatsConf not found in weblate formats models source"
+    raise RuntimeError(msg)
+
+
+def _formats_assignment_to_strings(class_body: list[ast.stmt]) -> list[str]:
+    for node in class_body:
+        if not isinstance(node, ast.Assign):
+            continue
+        for target in node.targets:
+            if isinstance(target, ast.Name) and target.id == "FORMATS":
+                return _string_tuple_or_list(node.value)
+    msg = "FORMATS assignment not found on FormatsConf"
+    raise RuntimeError(msg)
+
+
+def _string_tuple_or_list(node: ast.expr) -> list[str]:
+    if isinstance(node, (ast.Tuple, ast.List)):
+        out: list[str] = []
+        for elt in node.elts:
+            if isinstance(elt, ast.Constant) and isinstance(elt.value, str):
+                out.append(elt.value)
+            else:
+                msg = f"Unexpected literal in FormatsConf.FORMATS: {ast.dump(elt)}"
+                raise RuntimeError(msg)
+        return out
+    msg = f"Unexpected FormatsConf.FORMATS value: {ast.dump(node)}"
+    raise RuntimeError(msg)
 
 
 def weblate_formats_with_quickbook() -> tuple[str, ...]:
@@ -53,14 +80,13 @@ def weblate_formats_with_quickbook() -> tuple[str, ...]:
     """
     models_py = Path(weblate.formats.__file__).resolve().parent / "models.py"
     src = models_py.read_text(encoding="utf-8")
-    m = _FORMATS_BLOCK.search(src)
-    if not m:
+    try:
+        core = tuple(_parse_formatsconf_formats_ast(src))
+    except RuntimeError:
+        raise
+    except (SyntaxError, ValueError) as exc:
         msg = f"boost_weblate: could not parse FormatsConf.FORMATS from {models_py}"
-        raise RuntimeError(msg)
-    body = m.group(1)
-    core = tuple(
-        p for p in _STRING_LITERAL.findall(body) if p.startswith("weblate.formats.")
-    )
+        raise RuntimeError(msg) from exc
     if not core:
         msg = f"boost_weblate: no format paths parsed from {models_py}"
         raise RuntimeError(msg)
