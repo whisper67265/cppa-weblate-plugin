@@ -77,7 +77,7 @@ Do not duplicate pass-through vars in `environment:`; configure them once in `.e
 Build-time wiring (no env vars):
 
 1. **`settings_override.py`** is copied to `/app/data/settings-override.py` by the Dockerfile. Weblate's Docker entrypoint `exec()`s this file during settings load.
-2. **`WEBLATE_FORMATS`** — the override reads upstream `FormatsConf.FORMATS` via regex, appends `boost_weblate.formats.quickbook.QuickBookFormat`, and writes the result back to `WEBLATE_FORMATS`. No env var needed.
+2. **`WEBLATE_FORMATS`** — the override reads upstream `FormatsConf.FORMATS` via AST parse of `models.py`, appends `boost_weblate.formats.quickbook.QuickBookFormat`, and writes the result back to `WEBLATE_FORMATS`. No env var needed.
 3. **`INSTALLED_APPS`** — the override appends `boost_weblate.endpoint.apps.BoostEndpointConfig`. The app's `ready()` hook then registers `/boost-endpoint/` routes on `weblate.urls.real_patterns`.
 
 Runtime plugin env vars (set in `.env`, read by `settings_override.py` at boot):
@@ -423,7 +423,7 @@ Common causes:
 
 | Symptom | Likely cause | Fix |
 |---------|-------------|-----|
-| `AppRegistryNotReady` | Upstream Weblate reformatted `FormatsConf.FORMATS` | Update the `_FORMATS_BLOCK` regex in `settings_override.py` |
+| `RuntimeError` during settings `exec()` (e.g. `could not parse FormatsConf.FORMATS`) | Upstream Weblate restructured `FormatsConf.FORMATS` | Update the AST helpers in `settings_override.py` |
 | `connection refused` on Postgres | `pg_hba.conf` or firewall blocking Docker bridge | Allow `172.17.0.0/16` in `pg_hba.conf`; reload Postgres |
 | `WEBLATE_ADMIN_PASSWORD … set in .env` | `.env` missing or variable unset | Ensure `.env` exists at repo root with both required secrets |
 | `${WEBLATE_URL_PREFIX}/healthz/` 404 | `WEBLATE_URL_PREFIX` mismatch | Ensure `.env` has `WEBLATE_URL_PREFIX` matching nginx config |
