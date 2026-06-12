@@ -420,7 +420,7 @@ Common causes:
 
 | Symptom | Likely cause | Fix |
 |---------|-------------|-----|
-| `AppRegistryNotReady` | Upstream Weblate restructured `FormatsConf.FORMATS` | Update the AST helpers in `settings_override.py` |
+| `RuntimeError` during settings `exec()` (e.g. `could not parse FormatsConf.FORMATS`) | Upstream Weblate restructured `FormatsConf.FORMATS` | Update the AST helpers in `settings_override.py` |
 | `connection refused` on Postgres | `pg_hba.conf` or firewall blocking Docker bridge | Allow `172.17.0.0/16` in `pg_hba.conf`; reload Postgres |
 | `WEBLATE_ADMIN_PASSWORD … set in .env` | `.env` missing or variable unset | Ensure `.env` exists at repo root with both required secrets |
 | `${WEBLATE_URL_PREFIX}/healthz/` 404 | `WEBLATE_URL_PREFIX` mismatch | Ensure `.env` has `WEBLATE_URL_PREFIX` matching nginx config |
