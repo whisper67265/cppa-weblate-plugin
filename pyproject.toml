@@ -154,6 +154,7 @@ module-name = "boost_weblate"
 module-root = "src"
 source-include = [
   ".env.example",
+  "CHANGELOG.md",
   "docker/**",
   "docs/**",
   "LICENSES/**",

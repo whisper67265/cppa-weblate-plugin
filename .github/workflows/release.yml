@@ -55,6 +55,36 @@ jobs:
           exit 1
         fi
 
+    - name: Extract changelog section for release
+      id: changelog
+      env:
+        PLUGIN_VERSION: ${{ steps.versions.outputs.plugin_version }}
+        WEBLATE_VERSION: ${{ steps.versions.outputs.weblate_version }}
+      run: |
+        set -euo pipefail
+        notes_file="${RUNNER_TEMP}/release-notes.md"
+        python3 <<'PY'
+        import os
+        import re
+        from pathlib import Path
+
+        version = os.environ["PLUGIN_VERSION"]
+        weblate_version = os.environ["WEBLATE_VERSION"]
+        changelog = Path("CHANGELOG.md").read_text()
+        pattern = rf"^## \[{re.escape(version)}\].*?(?=^## |\Z)"
+        match = re.search(pattern, changelog, re.MULTILINE | re.DOTALL)
+        if not match:
+            raise SystemExit(
+                f"No ## [{version}] section found in CHANGELOG.md"
+            )
+        section = match.group(0).rstrip()
+        notes_file = Path(os.environ["RUNNER_TEMP"]) / "release-notes.md"
+        notes_file.write_text(
+            f"{section}\n\n---\n\nBuilt against Weblate {weblate_version}.\n"
+        )
+        PY
+        echo "notes_file=${notes_file}" >> "$GITHUB_OUTPUT"
+
     - name: Configure git for tag push
       run: |
         git config user.name "github-actions[bot]"
@@ -77,5 +107,4 @@ jobs:
         weblate_version="${{ steps.versions.outputs.weblate_version }}"
         gh release create "${tag}" \
           --title "${tag} (Weblate ${weblate_version})" \
-          --generate-notes \
-          --notes "Built against Weblate ${weblate_version}."
+          --notes-file "${{ steps.changelog.outputs.notes_file }}"

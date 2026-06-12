@@ -385,14 +385,16 @@ The workflow does not check deploy status or server health.
    - Plugin version: `[project].version` (e.g. `1.0.0`)
    - Weblate pin: `Weblate[all]==…` (e.g. `2026.5`)
 2. Fails if tag `v<plugin-version>` already exists on `origin` (prevents duplicate releases)
-3. Creates annotated tag `v<plugin-version>` on current `main` HEAD and pushes it
-4. Creates a GitHub Release with auto-generated notes, title `v<version> (Weblate <pin>)`, and body noting Weblate compatibility
+3. Extracts the matching `## [<plugin-version>]` section from [`CHANGELOG.md`](../CHANGELOG.md) (fails if missing, before any tag is pushed)
+4. Creates annotated tag `v<plugin-version>` on current `main` HEAD and pushes it
+5. Creates a GitHub Release with title `v<version> (Weblate <pin>)` and the extracted changelog as release notes, plus a trailing Weblate compatibility line
 
 Use the release title and body to verify which Weblate version the tagged tree was built against.
 
 ### Prerequisites
 
 - `version` in `pyproject.toml` on `main` must be the release you intend (bump on `develop` and promote, or commit on `main`, before running)
+- [`CHANGELOG.md`](../CHANGELOG.md) on `main` must include a `## [<version>]` section for that version
 - Tag `v<version>` must not already exist
 
 ### Failure modes
@@ -400,7 +402,8 @@ Use the release title and body to verify which Weblate version the tagged tree w
 | Failure | Likely cause |
 |---------|----------------|
 | Tag already exists | Re-ran without bumping `version` in `pyproject.toml` |
-| Wrong release contents | `main` HEAD did not include the expected `pyproject.toml` |
+| No changelog section | `CHANGELOG.md` on `main` has no `## [<version>]` heading for the intended release |
+| Wrong release contents | `main` HEAD did not include the expected `pyproject.toml` or `CHANGELOG.md` |
 | `gh release create` failed | Permissions or network; check whether the tag was pushed and finish the release manually on GitHub |
 
 ### Important

@@ -307,7 +307,7 @@ Each deploy SSHes to `/opt/cppa-weblate-plugin`, pulls the branch, rebuilds with
 1. **Promote** — run **Actions → Promote develop to main** ([`promote-main.yml`](.github/workflows/promote-main.yml)): fast-forward `main` to `develop` and push with repository secret **`PROMOTE_PAT`** (required so CI and deploy workflows run; `GITHUB_TOKEN` pushes do not trigger them).
 2. **Deploy** — when CI on `main` succeeds, `cd.yml` deploys using **production** environment secrets (`SSH_HOST`, `SSH_USER`, `SSH_PRIVATE_KEY`, `WEBLATE_PORT`, `WEBLATE_URL_PREFIX`; optional `SSH_PORT`).
 
-**Release** tagging ([`release.yml`](.github/workflows/release.yml)) is independent of deploy — run manually when you want a GitHub Release on `main`.
+**Release** tagging ([`release.yml`](.github/workflows/release.yml)) is independent of deploy — run manually when you want a GitHub Release on `main`. Release notes are taken from the matching `## [version]` section in [`CHANGELOG.md`](CHANGELOG.md) for the version in `pyproject.toml`.
 
 Full deployment and promotion procedure: [docs/deployment-runbook.md](docs/deployment-runbook.md) (staging, production, `PROMOTE_PAT`, rollback, release tagging).
 
@@ -332,6 +332,8 @@ Each script builds `docker/docker-compose.ci.yml`, waits for health, runs its py
 
 | Topic | File | Description |
 |-------|------|-------------|
+| Changelog | [`CHANGELOG.md`](CHANGELOG.md) | Version history (Keep a Changelog) |
+| API stability | [`CHANGELOG.md#deprecation-policy`](CHANGELOG.md#deprecation-policy) | SemVer, deprecation notice period, public API surface |
 | All env vars | [`.env.example`](.env.example) | Annotated template — copy to `.env` on the deploy server |
 | Deployment & promotion | [`docs/deployment-runbook.md`](docs/deployment-runbook.md) | Staging/production CD, `PROMOTE_PAT`, environments, health checks, rollback, release tagging |
 | Boost endpoint throttles | [`src/boost_weblate/settings_override.py`](src/boost_weblate/settings_override.py) | `BOOST_ENDPOINT_THROTTLE_INFO`, `BOOST_ENDPOINT_THROTTLE_ADD_OR_UPDATE`; merged into `REST_FRAMEWORK` |
