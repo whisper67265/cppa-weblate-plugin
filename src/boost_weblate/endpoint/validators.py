@@ -96,6 +96,8 @@ def _resolve_addresses(
 
 
 def _reject_unsafe_ip(addr: ipaddress.IPv4Address | ipaddress.IPv6Address) -> None:
+    if addr.is_unspecified:
+        raise ValidationError(f"Clone URL resolves to unspecified IP address: {addr}")
     if addr.is_private:
         raise ValidationError(f"Clone URL resolves to private IP address: {addr}")
     if addr.is_loopback:
@@ -130,13 +132,13 @@ def validate_clone_url(url: str) -> str:
     if not hostname:
         raise ValidationError("Clone URL must include a hostname")
 
+    _check_literal_host_ip(hostname)
+
     allowed_hosts: list[str] = getattr(settings, "ALLOWED_CLONE_HOSTS", [])
     if allowed_hosts and not _hostname_allowed(hostname, allowed_hosts):
         raise ValidationError(
             f"Clone URL host {hostname!r} is not in ALLOWED_CLONE_HOSTS"
         )
-
-    _check_literal_host_ip(hostname)
 
     first_addresses = _resolve_addresses(hostname)
     for addr in first_addresses:

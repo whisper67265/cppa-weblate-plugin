@@ -6,6 +6,7 @@
 
 from __future__ import annotations
 
+import importlib
 import importlib.util
 from pathlib import Path
 
@@ -79,14 +80,15 @@ def test_merge_boost_endpoint_throttle_rates_preserves_upstream() -> None:
     assert rates["add-or-update"] == BOOST_ENDPOINT_THROTTLE_RATES["add-or-update"]
 
 
-def test_allowed_clone_hosts_default() -> None:
-    from boost_weblate.settings_override import (
-        ALLOWED_CLONE_HOSTS,
-        allowed_clone_hosts,
-    )
+def test_allowed_clone_hosts_default(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("BOOST_ALLOWED_CLONE_HOSTS", raising=False)
 
-    assert allowed_clone_hosts() == ["github.com"]
-    assert ALLOWED_CLONE_HOSTS == ["github.com"]
+    import boost_weblate.settings_override as so
+
+    importlib.reload(so)
+
+    assert so.allowed_clone_hosts() == ["github.com"]
+    assert so.ALLOWED_CLONE_HOSTS == ["github.com"]
 
 
 def test_allowed_clone_hosts_parses_env(monkeypatch: pytest.MonkeyPatch) -> None:

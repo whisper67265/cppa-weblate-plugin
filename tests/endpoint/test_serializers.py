@@ -185,3 +185,19 @@ def test_add_or_update_serializer_rejects_invalid_submodule_segment() -> None:
     assert BoostEndpointErrorCode.INVALID_SUBMODULE.value in _error_codes(
         ser.structured_errors
     )
+
+
+def test_add_or_update_serializer_accumulates_custom_errors() -> None:
+    ser = AddOrUpdateRequestSerializer(
+        data={
+            "organization": "bad/org",
+            "version": "v",
+            "add_or_update": {"zh_Hans": ["../evil"]},
+        }
+    )
+    assert not ser.is_valid()
+    codes = _error_codes(ser.structured_errors)
+    assert BoostEndpointErrorCode.INVALID_CLONE_URL.value in codes
+    assert BoostEndpointErrorCode.INVALID_SUBMODULE.value in codes
+    fields = {e["metadata"]["field"] for e in ser.structured_errors}
+    assert fields == {"organization", "add_or_update"}

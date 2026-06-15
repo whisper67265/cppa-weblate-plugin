@@ -123,6 +123,26 @@ class TestValidateCloneUrlPrivateIp:
             validate_clone_url(url)
 
 
+class TestValidateCloneUrlUnspecifiedIp:
+    @pytest.mark.parametrize("ip", ("0.0.0.0", "::"))
+    def test_rejects_unspecified_resolved_ips(self, ip: str) -> None:
+        url = "https://github.com/boostorg/json.git"
+        with (
+            patch(
+                "boost_weblate.endpoint.validators.socket.getaddrinfo",
+                side_effect=_mock_getaddrinfo_ip(ip),
+            ),
+            pytest.raises(ValidationError, match="unspecified"),
+        ):
+            validate_clone_url(url)
+
+    @pytest.mark.parametrize("ip", ("0.0.0.0", "::"))
+    def test_rejects_literal_unspecified_host(self, ip: str) -> None:
+        url = f"https://[{ip}]/repo.git" if ":" in ip else f"https://{ip}/repo.git"
+        with pytest.raises(ValidationError, match="unspecified"):
+            validate_clone_url(url)
+
+
 class TestValidateCloneUrlAllowlist:
     @override_settings(ALLOWED_CLONE_HOSTS=["github.com"])
     def test_rejects_non_allowlisted_host(self) -> None:

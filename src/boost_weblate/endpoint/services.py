@@ -317,11 +317,7 @@ class BoostComponentService:
 
     def clone_repository(self, submodule: str, target_dir: str, branch: str) -> bool:
         """Clone a git repository to target directory."""
-        try:
-            repo_url = github_https_clone_url(self.organization, submodule)
-        except ValidationError as exc:
-            LOGGER.error("Invalid clone URL for %s: %s", submodule, exc)
-            return False
+        repo_url = github_https_clone_url(self.organization, submodule)
 
         try:
             LOGGER.info("Cloning %s to %s", repo_url, target_dir)
@@ -950,9 +946,21 @@ class BoostComponentService:
         os.makedirs(temp_submodule_dir, exist_ok=True)
 
         # Clone repository
-        if not self.clone_repository(
-            submodule, temp_submodule_dir, f"local-{self.lang_code}"
-        ):
+        try:
+            cloned = self.clone_repository(
+                submodule, temp_submodule_dir, f"local-{self.lang_code}"
+            )
+        except ValidationError as exc:
+            append_error(
+                result,
+                BoostEndpointErrorCode.INVALID_CLONE_URL,
+                str(exc),
+                submodule=submodule,
+                organization=self.organization,
+            )
+            return result
+
+        if not cloned:
             append_error(
                 result,
                 BoostEndpointErrorCode.CLONE_FAILED,

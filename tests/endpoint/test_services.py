@@ -380,7 +380,8 @@ class TestCloneRepository:
             "boost_weblate.endpoint.services.github_https_clone_url",
             side_effect=ValidationError("bad url"),
         ):
-            assert self.svc.clone_repository("mylib", "/tmp/mylib", "main") is False
+            with pytest.raises(ValidationError, match="bad url"):
+                self.svc.clone_repository("mylib", "/tmp/mylib", "main")
 
 
 # ---------------------------------------------------------------------------
@@ -1006,6 +1007,23 @@ class TestProcessSubmodule:
             result = self.svc.process_submodule("json", str(tmp_path))
         assert result["success"] is False
         assert _has_error_code(result["errors"], BoostEndpointErrorCode.CLONE_FAILED)
+
+    def test_clone_url_validation_failure_returns_invalid_clone_url(
+        self, tmp_path
+    ) -> None:
+        with patch.object(
+            self.svc,
+            "clone_repository",
+            side_effect=ValidationError("allowlist rejected"),
+        ):
+            result = self.svc.process_submodule("json", str(tmp_path))
+        assert result["success"] is False
+        assert _has_error_code(
+            result["errors"], BoostEndpointErrorCode.INVALID_CLONE_URL
+        )
+        assert not _has_error_code(
+            result["errors"], BoostEndpointErrorCode.CLONE_FAILED
+        )
 
     def test_no_docs_found_returns_error(self, tmp_path) -> None:
         with (

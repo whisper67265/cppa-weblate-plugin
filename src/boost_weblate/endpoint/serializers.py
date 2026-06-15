@@ -160,14 +160,16 @@ class AddOrUpdateRequestSerializer(serializers.Serializer):
         try:
             return validate_repo_segment(value, field="organization")
         except ValidationError as exc:
-            self._custom_validation_errors = boost_validation_errors(
-                [
-                    (
-                        BoostEndpointErrorCode.INVALID_CLONE_URL,
-                        str(exc),
-                        {"field": "organization"},
-                    )
-                ]
+            self._custom_validation_errors.extend(
+                boost_validation_errors(
+                    [
+                        (
+                            BoostEndpointErrorCode.INVALID_CLONE_URL,
+                            str(exc),
+                            {"field": "organization"},
+                        )
+                    ]
+                )
             )
             raise serializers.ValidationError(str(exc)) from exc
 
@@ -246,6 +248,6 @@ class AddOrUpdateRequestSerializer(serializers.Serializer):
                             )
                         )
         if items:
-            self._custom_validation_errors = boost_validation_errors(items)
+            self._custom_validation_errors.extend(boost_validation_errors(items))
             raise serializers.ValidationError({"add_or_update": "invalid"})
         return value
