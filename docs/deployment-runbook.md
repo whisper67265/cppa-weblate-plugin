@@ -86,6 +86,7 @@ Runtime plugin env vars (set in `.env`, read by `settings_override.py` at boot):
 |----------|-------------------|-------|
 | `BOOST_ENDPOINT_THROTTLE_INFO` | `60/minute` | Scoped rate for `GET /boost-endpoint/info/` |
 | `BOOST_ENDPOINT_THROTTLE_ADD_OR_UPDATE` | `10/hour` | Scoped rate for `POST /boost-endpoint/add-or-update/` |
+| `BOOST_ALLOWED_CLONE_HOSTS` | `github.com` | Comma-separated hostnames permitted for git clone URLs (HTTPS only; SSRF mitigation) |
 
 ### Weblate environment variables
 
@@ -110,6 +111,7 @@ Key variables (full reference in `.env.example`):
 | `CELERY_SINGLE_PROCESS` | `1` | `.env` | Weblate Celery worker process count; increase when tasks queue |
 | `BOOST_ENDPOINT_THROTTLE_INFO` | `60/minute` | `.env` | Plugin rate limit (see above) |
 | `BOOST_ENDPOINT_THROTTLE_ADD_OR_UPDATE` | `10/hour` | `.env` | Plugin rate limit (see above) |
+| `BOOST_ALLOWED_CLONE_HOSTS` | `github.com` | `.env` | Hostnames allowed for git clone URLs (see above) |
 | `WEBLATE_EMAIL_HOST` | `smtp.example.com` | `.env` | SMTP server; set user/password for production |
 | `WEBLATE_GITHUB_USERNAME` | — | `.env` | GitHub account for VCS; required with token for add-or-update |
 | `WEBLATE_GITHUB_TOKEN` | — | `.env` | GitHub PAT (`repo` scope); rotate via pre-deploy checklist |

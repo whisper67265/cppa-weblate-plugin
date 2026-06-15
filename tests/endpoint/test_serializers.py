@@ -157,3 +157,31 @@ def test_add_or_update_serializer_missing_required_fields() -> None:
     assert all(
         e["metadata"].get("drf_code") == "required" for e in ser.structured_errors
     )
+
+
+def test_add_or_update_serializer_rejects_invalid_organization() -> None:
+    ser = AddOrUpdateRequestSerializer(
+        data={
+            "organization": "bad/org",
+            "version": "v",
+            "add_or_update": {"zh_Hans": ["json"]},
+        }
+    )
+    assert not ser.is_valid()
+    assert BoostEndpointErrorCode.INVALID_CLONE_URL.value in _error_codes(
+        ser.structured_errors
+    )
+
+
+def test_add_or_update_serializer_rejects_invalid_submodule_segment() -> None:
+    ser = AddOrUpdateRequestSerializer(
+        data={
+            "organization": "o",
+            "version": "v",
+            "add_or_update": {"zh_Hans": ["../evil"]},
+        }
+    )
+    assert not ser.is_valid()
+    assert BoostEndpointErrorCode.INVALID_SUBMODULE.value in _error_codes(
+        ser.structured_errors
+    )

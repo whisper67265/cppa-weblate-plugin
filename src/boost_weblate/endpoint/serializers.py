@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from django.core.exceptions import ValidationError
 from rest_framework import serializers
 
 from boost_weblate.endpoint.errors import (
@@ -15,6 +16,7 @@ from boost_weblate.endpoint.errors import (
     boost_validation_errors,
     to_error_dict,
 )
+from boost_weblate.endpoint.validators import validate_repo_segment
 
 
 class AddOrUpdateRequestSerializer(serializers.Serializer):
@@ -153,6 +155,22 @@ class AddOrUpdateRequestSerializer(serializers.Serializer):
             return BoostEndpointErrorCode.REQUIRED_FIELD
         return BoostEndpointErrorCode.REQUIRED_FIELD
 
+    def validate_organization(self, value: str) -> str:
+        """Reject organization names that would produce unsafe clone URLs."""
+        try:
+            return validate_repo_segment(value, field="organization")
+        except ValidationError as exc:
+            self._custom_validation_errors = boost_validation_errors(
+                [
+                    (
+                        BoostEndpointErrorCode.INVALID_CLONE_URL,
+                        str(exc),
+                        {"field": "organization"},
+                    )
+                ]
+            )
+            raise serializers.ValidationError(str(exc)) from exc
+
     def validate_extensions(self, value: list[str] | None) -> list[str] | None:
         """Strip entries and remove blanks so all-empty input does not filter files."""
         if value is None:
@@ -198,6 +216,35 @@ class AddOrUpdateRequestSerializer(serializers.Serializer):
                         {"field": "add_or_update", "language": lang_code},
                     )
                 )
+            else:
+                for submodule in submodules:
+                    if not isinstance(submodule, str):
+                        items.append(
+                            (
+                                BoostEndpointErrorCode.INVALID_SUBMODULE_LIST,
+                                (
+                                    "add_or_update: each submodule name must be a "
+                                    f"string; key {lang_code!r} has "
+                                    f"{type(submodule).__name__}."
+                                ),
+                                {"field": "add_or_update", "language": lang_code},
+                            )
+                        )
+                        break
+                    try:
+                        validate_repo_segment(submodule, field="submodule")
+                    except ValidationError as exc:
+                        items.append(
+                            (
+                                BoostEndpointErrorCode.INVALID_SUBMODULE,
+                                str(exc),
+                                {
+                                    "field": "add_or_update",
+                                    "language": lang_code,
+                                    "submodule": submodule,
+                                },
+                            )
+                        )
         if items:
             self._custom_validation_errors = boost_validation_errors(items)
             raise serializers.ValidationError({"add_or_update": "invalid"})

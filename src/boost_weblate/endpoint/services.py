@@ -36,6 +36,7 @@ from typing import TYPE_CHECKING, Any, cast
 
 from django.conf import settings
 from django.contrib.messages import get_messages
+from django.core.exceptions import ValidationError
 from django.db import transaction
 from weblate.formats.models import FILE_FORMATS
 from weblate.lang.models import Language
@@ -49,6 +50,11 @@ from boost_weblate.endpoint.errors import (
     BoostEndpointErrorCode,
     append_error,
     to_error_dict,
+)
+from boost_weblate.endpoint.validators import (
+    github_https_clone_url,
+    github_ssh_repo_url,
+    validate_repo_segment,
 )
 
 if TYPE_CHECKING:
@@ -311,7 +317,11 @@ class BoostComponentService:
 
     def clone_repository(self, submodule: str, target_dir: str, branch: str) -> bool:
         """Clone a git repository to target directory."""
-        repo_url = f"https://github.com/{self.organization}/{submodule}.git"
+        try:
+            repo_url = github_https_clone_url(self.organization, submodule)
+        except ValidationError as exc:
+            LOGGER.error("Invalid clone URL for %s: %s", submodule, exc)
+            return False
 
         try:
             LOGGER.info("Cloning %s to %s", repo_url, target_dir)
@@ -508,7 +518,15 @@ class BoostComponentService:
             return None, False
 
         # Single clone per repo: first component gets real repo, others use weblate://
-        real_repo = f"git@github.com:{self.organization}/{submodule}.git"
+        try:
+            real_repo = github_ssh_repo_url(self.organization, submodule)
+        except ValidationError as exc:
+            LOGGER.error(
+                "Invalid repo URL for %s/%s: %s", self.organization, submodule, exc
+            )
+            report_error(cause="Component creation/update")
+            return None, False
+
         repo_owner = (
             Component.objects.filter(project=project, repo=real_repo)
             .order_by("slug")
@@ -901,6 +919,19 @@ class BoostComponentService:
             "components_deleted": 0,
             "errors": [],
         }
+
+        try:
+            validate_repo_segment(self.organization, field="organization")
+            validate_repo_segment(submodule, field="submodule")
+        except ValidationError as exc:
+            append_error(
+                result,
+                BoostEndpointErrorCode.INVALID_CLONE_URL,
+                str(exc),
+                submodule=submodule,
+                organization=self.organization,
+            )
+            return result
 
         # Create temp directory for this submodule
         temp_submodule_dir = os.path.join(temp_dir, submodule)

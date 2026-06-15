@@ -9,6 +9,8 @@ from __future__ import annotations
 import importlib.util
 from pathlib import Path
 
+import pytest
+
 _QBK = "boost_weblate.formats.quickbook.QuickBookFormat"
 
 
@@ -75,3 +77,23 @@ def test_merge_boost_endpoint_throttle_rates_preserves_upstream() -> None:
     assert rates["anon"] == "100/day"
     assert rates["info"] == BOOST_ENDPOINT_THROTTLE_RATES["info"]
     assert rates["add-or-update"] == BOOST_ENDPOINT_THROTTLE_RATES["add-or-update"]
+
+
+def test_allowed_clone_hosts_default() -> None:
+    from boost_weblate.settings_override import (
+        ALLOWED_CLONE_HOSTS,
+        allowed_clone_hosts,
+    )
+
+    assert allowed_clone_hosts() == ["github.com"]
+    assert ALLOWED_CLONE_HOSTS == ["github.com"]
+
+
+def test_allowed_clone_hosts_parses_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    from boost_weblate.settings_override import allowed_clone_hosts
+
+    monkeypatch.setenv("BOOST_ALLOWED_CLONE_HOSTS", "GitHub.com, GitLab.com")
+    assert allowed_clone_hosts() == ["github.com", "gitlab.com"]
+
+    monkeypatch.setenv("BOOST_ALLOWED_CLONE_HOSTS", "")
+    assert allowed_clone_hosts() == []
