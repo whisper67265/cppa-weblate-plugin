@@ -151,7 +151,9 @@ def boost_task_lock_settings() -> dict[str, Any]:
         "on_conflict": os.environ.get(
             "BOOST_TASK_LOCK_ON_CONFLICT",
             _DEFAULT_BOOST_TASK_LOCK_ON_CONFLICT,
-        ),
+        )
+        .lower()
+        .strip(),
         "wait_timeout": int(
             os.environ.get(
                 "BOOST_TASK_LOCK_WAIT_TIMEOUT",

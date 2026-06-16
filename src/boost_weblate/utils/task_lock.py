@@ -14,7 +14,7 @@ from collections.abc import Callable
 from typing import Any, ParamSpec, TypeVar
 
 from django_redis import get_redis_connection
-from redis.exceptions import LockError
+from redis.exceptions import LockError, RedisError
 from redis.lock import Lock
 
 from boost_weblate.endpoint.errors import BoostEndpointError, BoostEndpointErrorCode
@@ -105,7 +105,17 @@ def redis_task_lock(
                 try:
                     lock.release()
                 except LockError:
-                    pass
+                    logger.debug(
+                        "Lock release failed (lock-specific): lock_key=%s",
+                        key,
+                        exc_info=True,
+                    )
+                except RedisError:
+                    logger.warning(
+                        "Lock release failed (Redis infrastructure): lock_key=%s",
+                        key,
+                        exc_info=True,
+                    )
 
         return wrapper
 
