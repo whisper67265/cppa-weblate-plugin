@@ -119,6 +119,21 @@ def boost_endpoint_throttle_rates() -> dict[str, str]:
 
 BOOST_ENDPOINT_THROTTLE_RATES = boost_endpoint_throttle_rates()
 
+_DEFAULT_ALLOWED_CLONE_HOSTS = ("github.com",)
+
+
+def allowed_clone_hosts() -> list[str]:
+    """Hostnames permitted for git clone URLs (env override optional)."""
+    raw = os.environ.get("BOOST_ALLOWED_CLONE_HOSTS")
+    if raw is None:
+        return list(_DEFAULT_ALLOWED_CLONE_HOSTS)
+    if raw.strip() == "":
+        return []
+    return [host.strip().lower() for host in raw.split(",") if host.strip()]
+
+
+ALLOWED_CLONE_HOSTS = allowed_clone_hosts()
+
 
 def merge_boost_endpoint_throttle_rates(
     rest_framework: dict[str, Any],

@@ -343,7 +343,7 @@ Top-level entry point called by the Celery task. Creates a temporary directory, 
 
 For each submodule the following steps run in order:
 
-1. **Path validation** — the submodule name is checked against the temp directory root to prevent path traversal.
+1. **Path validation** — the submodule name is checked against the temp directory root to prevent path traversal. Organization and submodule names must match `^[A-Za-z0-9._-]+$`. Clone URLs are validated before any `git` subprocess: only `https://` (and SCP-style SSH normalized to HTTPS for checks) is allowed; resolved addresses must not be private, loopback, or link-local; the hostname must appear in `ALLOWED_CLONE_HOSTS` (default `github.com`, overridable via `BOOST_ALLOWED_CLONE_HOSTS`).
 
 2. **Clone** — `git clone -b local-{lang_code} --depth 1 https://github.com/{organization}/{submodule}.git` into a temporary subdirectory. A 300-second timeout applies. Clone failure is recorded in `errors` and processing stops for that submodule.
 
@@ -404,7 +404,8 @@ HTTP `400` responses and submodule `errors` lists use the same object schema. Va
 | `required_field` | Missing `organization`, `version`, or `add_or_update`; empty `add_or_update` dict |
 | `invalid_language_code` | Non-string or blank language key in `add_or_update` |
 | `invalid_submodule_list` | Submodule value is not a non-empty list |
-| `invalid_submodule` | Submodule name fails path validation |
+| `invalid_submodule` | Submodule name fails path or segment validation |
+| `invalid_clone_url` | Organization/submodule or resolved clone URL fails SSRF checks (bad scheme, private IP, or host not in `ALLOWED_CLONE_HOSTS`) |
 | `clone_failed` | `git clone` failed or timed out |
 | `no_documentation_files` | No supported doc files found after scan |
 | `permission_denied` | Missing `project.add` or `project.edit` |

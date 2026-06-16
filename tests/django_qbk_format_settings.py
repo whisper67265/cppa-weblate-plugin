@@ -23,7 +23,10 @@ import tempfile
 
 import weblate.settings_example as _wl_example
 
-from boost_weblate.settings_override import merge_boost_endpoint_throttle_rates
+from boost_weblate.settings_override import (
+    ALLOWED_CLONE_HOSTS,
+    merge_boost_endpoint_throttle_rates,
+)
 
 for _key, _value in _wl_example.__dict__.items():
     if _key.isupper():
@@ -63,3 +66,5 @@ PASSWORD_HASHERS = [
 ]
 
 REST_FRAMEWORK = merge_boost_endpoint_throttle_rates(_wl_example.REST_FRAMEWORK)
+
+ALLOWED_CLONE_HOSTS = ALLOWED_CLONE_HOSTS

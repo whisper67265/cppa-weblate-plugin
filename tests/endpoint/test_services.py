@@ -13,6 +13,7 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
+from django.core.exceptions import ValidationError
 
 from boost_weblate.endpoint.errors import BoostEndpointErrorCode
 from boost_weblate.endpoint.services import (
@@ -309,6 +310,14 @@ class TestScanDocumentationFiles:
 class TestCloneRepository:
     def setup_method(self) -> None:
         self.svc = _make_svc()
+        self._clone_url_patcher = patch(
+            "boost_weblate.endpoint.services.github_https_clone_url",
+            side_effect=lambda org, sub: f"https://github.com/{org}/{sub}.git",
+        )
+        self._clone_url_patcher.start()
+
+    def teardown_method(self) -> None:
+        self._clone_url_patcher.stop()
 
     def test_successful_clone_returns_true(self) -> None:
         mock_result = MagicMock()
@@ -365,6 +374,14 @@ class TestCloneRepository:
         assert "https://github.com/boost/mylib.git" in cmd
         assert "-b" in cmd
         assert "mybranch" in cmd
+
+    def test_rejects_invalid_clone_url(self) -> None:
+        with patch(
+            "boost_weblate.endpoint.services.github_https_clone_url",
+            side_effect=ValidationError("bad url"),
+        ):
+            with pytest.raises(ValidationError, match="bad url"):
+                self.svc.clone_repository("mylib", "/tmp/mylib", "main")
 
 
 # ---------------------------------------------------------------------------
@@ -469,6 +486,11 @@ class TestGetOrCreateProject:
 class TestCreateOrUpdateComponent:
     def setup_method(self) -> None:
         self.svc = _make_svc(lang_code="zh_Hans", version="1.0")
+        self._ssh_url_patcher = patch(
+            "boost_weblate.endpoint.services.github_ssh_repo_url",
+            side_effect=lambda org, sub: f"git@github.com:{org}/{sub}.git",
+        )
+        self._ssh_url_patcher.start()
         self.project = MagicMock()
         self.project.pk = 1
         self.project.slug = "boost-json-documentation-zh_hans"
@@ -480,6 +502,9 @@ class TestCreateOrUpdateComponent:
             "new_base": "doc/intro.adoc",
             "file_format": "adoc",
         }
+
+    def teardown_method(self) -> None:
+        self._ssh_url_patcher.stop()
 
     def test_missing_config_keys_returns_none(self) -> None:
         bad_config = {"component_slug": "x"}  # missing many keys
@@ -983,6 +1008,23 @@ class TestProcessSubmodule:
         assert result["success"] is False
         assert _has_error_code(result["errors"], BoostEndpointErrorCode.CLONE_FAILED)
 
+    def test_clone_url_validation_failure_returns_invalid_clone_url(
+        self, tmp_path
+    ) -> None:
+        with patch.object(
+            self.svc,
+            "clone_repository",
+            side_effect=ValidationError("allowlist rejected"),
+        ):
+            result = self.svc.process_submodule("json", str(tmp_path))
+        assert result["success"] is False
+        assert _has_error_code(
+            result["errors"], BoostEndpointErrorCode.INVALID_CLONE_URL
+        )
+        assert not _has_error_code(
+            result["errors"], BoostEndpointErrorCode.CLONE_FAILED
+        )
+
     def test_no_docs_found_returns_error(self, tmp_path) -> None:
         with (
             patch.object(self.svc, "clone_repository", return_value=True),
@@ -1101,7 +1143,15 @@ class TestProcessSubmodule:
         result = self.svc.process_submodule("../evil", str(tmp_path))
         assert result["success"] is False
         assert _has_error_code(
-            result["errors"], BoostEndpointErrorCode.INVALID_SUBMODULE
+            result["errors"], BoostEndpointErrorCode.INVALID_CLONE_URL
+        )
+
+    def test_invalid_organization_rejected_before_clone(self, tmp_path) -> None:
+        svc = _make_svc(organization="bad/org")
+        result = svc.process_submodule("json", str(tmp_path))
+        assert result["success"] is False
+        assert _has_error_code(
+            result["errors"], BoostEndpointErrorCode.INVALID_CLONE_URL
         )
 
 

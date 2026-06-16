@@ -16,6 +16,7 @@ class BoostEndpointErrorCode(StrEnum):
     """Stable machine-readable error codes for Boost endpoint failures."""
 
     INVALID_SUBMODULE = "invalid_submodule"
+    INVALID_CLONE_URL = "invalid_clone_url"
     CLONE_FAILED = "clone_failed"
     NO_DOCUMENTATION_FILES = "no_documentation_files"
     PERMISSION_DENIED = "permission_denied"
