@@ -21,8 +21,10 @@ updates:
   labels:
   - dependencies
   - python
-    # Note: dependency-type-based groups are not supported for uv yet
-    # (see dependabot/dependabot-core#13202). Group by semver bump size instead.
+  # Direct deps only (packaging, Weblate[all]). Transitive lockfile entries are
+  # pinned by Weblate and updated via weblate-pin-bump, not independently.
+  allow:
+  - dependency-type: direct
   groups:
     uv-patch-minor:
       update-types:
