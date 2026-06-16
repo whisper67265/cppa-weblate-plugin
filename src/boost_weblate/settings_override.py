@@ -134,6 +134,38 @@ def allowed_clone_hosts() -> list[str]:
 
 ALLOWED_CLONE_HOSTS = allowed_clone_hosts()
 
+_DEFAULT_BOOST_TASK_LOCK_TIMEOUT = 1800
+_DEFAULT_BOOST_TASK_LOCK_ON_CONFLICT = "skip"
+_DEFAULT_BOOST_TASK_LOCK_WAIT_TIMEOUT = 300
+
+
+def boost_task_lock_settings() -> dict[str, Any]:
+    """Redis task-lock settings for Celery deduplication (env overrides optional)."""
+    return {
+        "timeout": int(
+            os.environ.get(
+                "BOOST_TASK_LOCK_TIMEOUT",
+                str(_DEFAULT_BOOST_TASK_LOCK_TIMEOUT),
+            )
+        ),
+        "on_conflict": os.environ.get(
+            "BOOST_TASK_LOCK_ON_CONFLICT",
+            _DEFAULT_BOOST_TASK_LOCK_ON_CONFLICT,
+        ),
+        "wait_timeout": int(
+            os.environ.get(
+                "BOOST_TASK_LOCK_WAIT_TIMEOUT",
+                str(_DEFAULT_BOOST_TASK_LOCK_WAIT_TIMEOUT),
+            )
+        ),
+    }
+
+
+_task_lock_settings = boost_task_lock_settings()
+BOOST_TASK_LOCK_TIMEOUT = _task_lock_settings["timeout"]
+BOOST_TASK_LOCK_ON_CONFLICT = _task_lock_settings["on_conflict"]
+BOOST_TASK_LOCK_WAIT_TIMEOUT = _task_lock_settings["wait_timeout"]
+
 
 def merge_boost_endpoint_throttle_rates(
     rest_framework: dict[str, Any],

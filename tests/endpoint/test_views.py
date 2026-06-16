@@ -38,6 +38,43 @@ _ADD_OR_UPDATE_BODY = {
     "add_or_update": {"zh_Hans": ["json"]},
 }
 
+_TASK_KWARGS = {
+    "organization": "org",
+    "add_or_update": {"zh_Hans": ["a"], "ja": ["json"]},
+    "version": "boost-1.0",
+    "extensions": [".md"],
+    "user_id": 7,
+}
+
+
+class _FakeLock:
+    """Redis lock stub that always acquires."""
+
+    def __init__(self) -> None:
+        self.released = False
+
+    def acquire(
+        self, blocking: bool = True, blocking_timeout: float | None = None
+    ) -> bool:
+        return True
+
+    def release(self) -> None:
+        self.released = True
+
+
+@pytest.fixture(autouse=True)
+def _mock_task_lock_acquire(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Default: task lock always acquired unless a test overrides Lock."""
+
+    def _fake_lock(*_args, **_kwargs) -> _FakeLock:
+        return _FakeLock()
+
+    monkeypatch.setattr("boost_weblate.utils.task_lock.Lock", _fake_lock)
+    monkeypatch.setattr(
+        "boost_weblate.utils.task_lock._get_redis_client",
+        lambda: MagicMock(),
+    )
+
 
 def _throttle_rest_framework(**rate_overrides: str) -> dict:
     rf = deepcopy(settings.REST_FRAMEWORK)
@@ -273,6 +310,109 @@ def test_boost_add_or_update_task_propagates_service_errors(
             user_id=1,
         )
     assert exc_info.value.code == BoostEndpointErrorCode.TASK_INTERNAL_ERROR
+
+
+def test_boost_add_or_update_task_duplicate_raises_task_duplicate(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from boost_weblate.endpoint import tasks as tasks_mod
+
+    user = MagicMock()
+    monkeypatch.setattr(tasks_mod.User.objects, "get", lambda pk: user)
+
+    process_calls = 0
+
+    class FakeService:
+        def __init__(self, **_kw):  # noqa: ANN003
+            pass
+
+        def process_all(self, _submodules, *, user, request=None):  # noqa: ANN001
+            nonlocal process_calls
+            process_calls += 1
+            return {}
+
+    monkeypatch.setattr(tasks_mod, "BoostComponentService", FakeService)
+
+    acquire_results = iter([True, False])
+
+    class DuplicateFakeLock:
+        def acquire(
+            self, blocking: bool = True, blocking_timeout: float | None = None
+        ) -> bool:
+            return next(acquire_results)
+
+        def release(self) -> None:
+            pass
+
+    monkeypatch.setattr(
+        "boost_weblate.utils.task_lock.Lock",
+        lambda *_a, **_k: DuplicateFakeLock(),
+    )
+
+    tasks_mod.boost_add_or_update_task.run(**_TASK_KWARGS)
+
+    with pytest.raises(BoostEndpointError) as exc_info:
+        tasks_mod.boost_add_or_update_task.run(**_TASK_KWARGS)
+
+    assert exc_info.value.code == BoostEndpointErrorCode.TASK_DUPLICATE
+    assert "lock_key" in exc_info.value.metadata
+    assert process_calls == 2
+
+
+def test_boost_add_or_update_task_lock_released_on_success(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from boost_weblate.endpoint import tasks as tasks_mod
+
+    user = MagicMock()
+    monkeypatch.setattr(tasks_mod.User.objects, "get", lambda pk: user)
+
+    class FakeService:
+        def __init__(self, **_kw):  # noqa: ANN003
+            pass
+
+        def process_all(self, _submodules, *, user, request=None):  # noqa: ANN001
+            return {}
+
+    monkeypatch.setattr(tasks_mod, "BoostComponentService", FakeService)
+
+    lock = _FakeLock()
+    monkeypatch.setattr(
+        "boost_weblate.utils.task_lock.Lock",
+        lambda *_a, **_k: lock,
+    )
+
+    tasks_mod.boost_add_or_update_task.run(**_TASK_KWARGS)
+    assert lock.released is True
+
+
+def test_build_add_or_update_lock_key_is_stable() -> None:
+    from boost_weblate.utils.task_lock import build_add_or_update_lock_key
+
+    key_a = build_add_or_update_lock_key(
+        organization="org",
+        version="boost-1.0",
+        extensions=[".md", ".adoc"],
+        add_or_update={"ja": ["json", "asio"], "zh_Hans": ["a"]},
+        user_id=1,
+    )
+    key_b = build_add_or_update_lock_key(
+        organization="org",
+        version="boost-1.0",
+        extensions=[".adoc", ".md"],
+        add_or_update={"zh_Hans": ["a"], "ja": ["asio", "json"]},
+        user_id=99,
+    )
+    key_c = build_add_or_update_lock_key(
+        organization="org",
+        version="boost-2.0",
+        extensions=[".md", ".adoc"],
+        add_or_update={"ja": ["json", "asio"], "zh_Hans": ["a"]},
+        user_id=1,
+    )
+
+    assert key_a == key_b
+    assert key_a != key_c
 
 
 def test_boost_endpoint_info_returns_429_when_scoped_throttled(
