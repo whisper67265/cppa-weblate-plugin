@@ -6,6 +6,7 @@
 
 from __future__ import annotations
 
+from enum import StrEnum
 from typing import Any
 
 from django.core.exceptions import ValidationError
@@ -17,6 +18,23 @@ from boost_weblate.endpoint.errors import (
     to_error_dict,
 )
 from boost_weblate.endpoint.validators import validate_repo_segment
+
+
+class DrfValidationCode(StrEnum):
+    """DRF ``ErrorDetail.code`` values mapped by this serializer."""
+
+    REQUIRED = "required"
+    NOT_A_LIST = "not_a_list"
+    EMPTY = "empty"
+
+
+class RequestField(StrEnum):
+    """Top-level add-or-update request field names."""
+
+    ORGANIZATION = "organization"
+    ADD_OR_UPDATE = "add_or_update"
+    VERSION = "version"
+    EXTENSIONS = "extensions"
 
 
 class AddOrUpdateRequestSerializer(serializers.Serializer):
@@ -55,6 +73,7 @@ class AddOrUpdateRequestSerializer(serializers.Serializer):
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
         self._custom_validation_errors: list[dict[str, Any]] = []
+        self._custom_error_fields: set[str] = set()
         self._structured_errors: list[dict[str, Any]] = []
 
     @property
@@ -63,6 +82,7 @@ class AddOrUpdateRequestSerializer(serializers.Serializer):
 
     def is_valid(self, *, raise_exception: bool = False) -> bool:
         self._custom_validation_errors = []
+        self._custom_error_fields = set()
         valid = super().is_valid(raise_exception=False)
         if not valid:
             self._structured_errors = self._to_structured_errors()
@@ -75,16 +95,14 @@ class AddOrUpdateRequestSerializer(serializers.Serializer):
     def _to_structured_errors(self) -> list[dict[str, Any]]:
         structured = list(self._custom_validation_errors)
         for field, messages in self.errors.items():
-            if field == "add_or_update" and self._custom_validation_errors:
+            if field in self._custom_error_fields:
                 continue
-            for subfield, message, drf_code in self._flatten_field_errors(
-                field, messages
-            ):
+            for subfield, message, drf_code in self._flatten_field_errors(messages):
                 code = self._code_for_drf_error(field, drf_code, subfield=subfield)
                 metadata: dict[str, Any] = {"field": field}
                 if drf_code is not None:
                     metadata["drf_code"] = drf_code
-                if subfield and field == "add_or_update":
+                if subfield and field == RequestField.ADD_OR_UPDATE:
                     metadata["language"] = subfield
                 structured.append(to_error_dict(code, message, **metadata))
         return structured
@@ -95,7 +113,7 @@ class AddOrUpdateRequestSerializer(serializers.Serializer):
 
     @staticmethod
     def _flatten_field_errors(
-        field: str, messages: Any
+        messages: Any,
     ) -> list[tuple[str | None, str, str | None]]:
         """Flatten nested DRF errors into (subfield, message, drf_code) triplets."""
         results: list[tuple[str | None, str, str | None]] = []
@@ -106,7 +124,7 @@ class AddOrUpdateRequestSerializer(serializers.Serializer):
                     for msg in value:
                         if isinstance(msg, dict) or hasattr(msg, "items"):
                             nested = AddOrUpdateRequestSerializer._flatten_field_errors(
-                                field, msg
+                                msg
                             )
                             results.extend(
                                 (key_str if sub is None else sub, message, drf_code)
@@ -118,9 +136,7 @@ class AddOrUpdateRequestSerializer(serializers.Serializer):
                             )
                             results.append((key_str, message, drf_code))
                 elif isinstance(value, dict) or hasattr(value, "items"):
-                    nested = AddOrUpdateRequestSerializer._flatten_field_errors(
-                        field, value
-                    )
+                    nested = AddOrUpdateRequestSerializer._flatten_field_errors(value)
                     results.extend(
                         (key_str if sub is None else sub, message, drf_code)
                         for sub, message, drf_code in nested
@@ -145,12 +161,12 @@ class AddOrUpdateRequestSerializer(serializers.Serializer):
         *,
         subfield: str | None = None,
     ) -> BoostEndpointErrorCode:
-        if drf_code == "required":
+        if drf_code == DrfValidationCode.REQUIRED:
             return BoostEndpointErrorCode.REQUIRED_FIELD
-        if drf_code == "not_a_list":
+        if drf_code == DrfValidationCode.NOT_A_LIST:
             return BoostEndpointErrorCode.INVALID_SUBMODULE_LIST
-        if drf_code == "empty":
-            if field == "add_or_update" and subfield:
+        if drf_code == DrfValidationCode.EMPTY:
+            if field == RequestField.ADD_OR_UPDATE and subfield:
                 return BoostEndpointErrorCode.INVALID_SUBMODULE_LIST
             return BoostEndpointErrorCode.REQUIRED_FIELD
         return BoostEndpointErrorCode.REQUIRED_FIELD
@@ -160,13 +176,14 @@ class AddOrUpdateRequestSerializer(serializers.Serializer):
         try:
             return validate_repo_segment(value, field="organization")
         except ValidationError as exc:
+            self._custom_error_fields.add(RequestField.ORGANIZATION)
             self._custom_validation_errors.extend(
                 boost_validation_errors(
                     [
                         (
                             BoostEndpointErrorCode.INVALID_CLONE_URL,
                             str(exc),
-                            {"field": "organization"},
+                            {"field": RequestField.ORGANIZATION},
                         )
                     ]
                 )
@@ -191,7 +208,10 @@ class AddOrUpdateRequestSerializer(serializers.Serializer):
                             "add_or_update: each key must be a non-empty language "
                             f"code; got {repr(lang_code)}"
                         ),
-                        {"field": "add_or_update", "language": str(lang_code)},
+                        {
+                            "field": RequestField.ADD_OR_UPDATE,
+                            "language": str(lang_code),
+                        },
                     )
                 )
                 continue
@@ -204,7 +224,7 @@ class AddOrUpdateRequestSerializer(serializers.Serializer):
                             f"submodule names; key {lang_code!r} is not a list "
                             f"(got {type(submodules).__name__})."
                         ),
-                        {"field": "add_or_update", "language": lang_code},
+                        {"field": RequestField.ADD_OR_UPDATE, "language": lang_code},
                     )
                 )
             elif len(submodules) == 0:
@@ -215,7 +235,7 @@ class AddOrUpdateRequestSerializer(serializers.Serializer):
                             "add_or_update: each value must be a non-empty list of "
                             f"submodule names; key {lang_code!r} has an empty list."
                         ),
-                        {"field": "add_or_update", "language": lang_code},
+                        {"field": RequestField.ADD_OR_UPDATE, "language": lang_code},
                     )
                 )
             else:
@@ -229,7 +249,10 @@ class AddOrUpdateRequestSerializer(serializers.Serializer):
                                     f"string; key {lang_code!r} has "
                                     f"{type(submodule).__name__}."
                                 ),
-                                {"field": "add_or_update", "language": lang_code},
+                                {
+                                    "field": RequestField.ADD_OR_UPDATE,
+                                    "language": lang_code,
+                                },
                             )
                         )
                         break
@@ -241,13 +264,14 @@ class AddOrUpdateRequestSerializer(serializers.Serializer):
                                 BoostEndpointErrorCode.INVALID_SUBMODULE,
                                 str(exc),
                                 {
-                                    "field": "add_or_update",
+                                    "field": RequestField.ADD_OR_UPDATE,
                                     "language": lang_code,
                                     "submodule": submodule,
                                 },
                             )
                         )
         if items:
+            self._custom_error_fields.add(RequestField.ADD_OR_UPDATE)
             self._custom_validation_errors.extend(boost_validation_errors(items))
-            raise serializers.ValidationError({"add_or_update": "invalid"})
+            raise serializers.ValidationError({RequestField.ADD_OR_UPDATE: "invalid"})
         return value

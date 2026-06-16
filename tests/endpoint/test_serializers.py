@@ -7,7 +7,11 @@ from __future__ import annotations
 from rest_framework.exceptions import ErrorDetail
 
 from boost_weblate.endpoint.errors import BoostEndpointErrorCode
-from boost_weblate.endpoint.serializers import AddOrUpdateRequestSerializer
+from boost_weblate.endpoint.serializers import (
+    AddOrUpdateRequestSerializer,
+    DrfValidationCode,
+    RequestField,
+)
 
 
 def _error_codes(errors: list[dict]) -> list[str]:
@@ -108,13 +112,11 @@ def test_flatten_field_errors_propagates_error_detail_code() -> None:
         "zh_Hans": [
             ErrorDetail(
                 'Expected a list of items but got type "str".',
-                code="not_a_list",
+                code=DrfValidationCode.NOT_A_LIST,
             )
         ]
     }
-    flattened = AddOrUpdateRequestSerializer._flatten_field_errors(
-        "add_or_update", nested
-    )
+    flattened = AddOrUpdateRequestSerializer._flatten_field_errors(nested)
     assert flattened == [
         (
             "zh_Hans",
@@ -126,23 +128,29 @@ def test_flatten_field_errors_propagates_error_detail_code() -> None:
 
 def test_code_for_drf_error_maps_drf_codes() -> None:
     assert (
-        AddOrUpdateRequestSerializer._code_for_drf_error("organization", "required")
+        AddOrUpdateRequestSerializer._code_for_drf_error(
+            RequestField.ORGANIZATION, DrfValidationCode.REQUIRED
+        )
         == BoostEndpointErrorCode.REQUIRED_FIELD
     )
     assert (
         AddOrUpdateRequestSerializer._code_for_drf_error(
-            "add_or_update", "not_a_list", subfield="zh_Hans"
+            RequestField.ADD_OR_UPDATE,
+            DrfValidationCode.NOT_A_LIST,
+            subfield="zh_Hans",
         )
         == BoostEndpointErrorCode.INVALID_SUBMODULE_LIST
     )
     assert (
         AddOrUpdateRequestSerializer._code_for_drf_error(
-            "add_or_update", "empty", subfield="zh_Hans"
+            RequestField.ADD_OR_UPDATE, DrfValidationCode.EMPTY, subfield="zh_Hans"
         )
         == BoostEndpointErrorCode.INVALID_SUBMODULE_LIST
     )
     assert (
-        AddOrUpdateRequestSerializer._code_for_drf_error("add_or_update", "empty")
+        AddOrUpdateRequestSerializer._code_for_drf_error(
+            RequestField.ADD_OR_UPDATE, DrfValidationCode.EMPTY
+        )
         == BoostEndpointErrorCode.REQUIRED_FIELD
     )
 
@@ -201,3 +209,26 @@ def test_add_or_update_serializer_accumulates_custom_errors() -> None:
     assert BoostEndpointErrorCode.INVALID_SUBMODULE.value in codes
     fields = {e["metadata"]["field"] for e in ser.structured_errors}
     assert fields == {"organization", "add_or_update"}
+
+
+def test_invalid_organization_still_flattens_other_drf_errors() -> None:
+    ser = AddOrUpdateRequestSerializer(
+        data={
+            "organization": "bad/org",
+            "add_or_update": {"zh_Hans": ["json"]},
+        }
+    )
+    assert not ser.is_valid()
+    codes = _error_codes(ser.structured_errors)
+    assert BoostEndpointErrorCode.INVALID_CLONE_URL.value in codes
+    assert BoostEndpointErrorCode.REQUIRED_FIELD.value in codes
+    org_errors = [
+        e for e in ser.structured_errors if e["metadata"]["field"] == "organization"
+    ]
+    version_errors = [
+        e for e in ser.structured_errors if e["metadata"]["field"] == "version"
+    ]
+    assert len(org_errors) == 1
+    assert org_errors[0]["code"] == BoostEndpointErrorCode.INVALID_CLONE_URL.value
+    assert len(version_errors) == 1
+    assert version_errors[0]["metadata"]["drf_code"] == "required"
