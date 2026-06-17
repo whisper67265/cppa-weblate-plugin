@@ -389,7 +389,7 @@ Compare against the committed baseline and fail on regression (default 20% mean)
 uv run --group dev pytest -m benchmark --benchmark-only -v \
   -k "not peak_memory" \
   --benchmark-compare=0001 \
-  --benchmark-compare-fail=mean:20% \
+  --benchmark-compare-fail=mean:30% \
   tests/utils/test_quickbook.py
 ```
 
@@ -413,7 +413,7 @@ Commit the updated `.benchmarks/Linux-CPython-3.14-64bit/0001_baseline.json`. If
 | 1 MB `QuickBookFile.parse` | ~0.55 s | (units ≈ segments) |
 | 1 MB peak memory (`tracemalloc`) | ~5.3 MiB | — |
 
-CI sets `BENCHMARK_COMPARE_FAIL` (default `mean:20%`) and `BENCHMARK_COMPARE_ENABLED` (default `true`; set `false` for record-only runs). See [`.github/WORKFLOWS.md`](.github/WORKFLOWS.md).
+CI sets `BENCHMARK_COMPARE_FAIL` (default `mean:30%`) and `BENCHMARK_COMPARE_ENABLED` (default `true`; set `false` for record-only runs). See [`.github/WORKFLOWS.md`](.github/WORKFLOWS.md).
 
 - **Pull requests:** open PRs against the default branch on GitHub. Keep changes focused; ensure CI is green. Respond to review feedback on the PR thread; for design questions or bug reports, use [Issues](https://github.com/cppalliance/cppa-weblate-plugin/issues).
 

@@ -16,6 +16,7 @@ Or with an explicit QuickBook path::
 from __future__ import annotations
 
 import functools
+import os
 import sys
 import tracemalloc
 from io import BytesIO
@@ -26,6 +27,8 @@ from hypothesis import given
 from hypothesis import strategies as st
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
+# Needed for standalone execution (python tests/utils/test_quickbook.py);
+# pytest picks this up via conftest.pytest_configure instead.
 sys.path.insert(0, str(_REPO_ROOT / "src"))
 
 from translate.storage.pypo import pofile  # noqa: E402
@@ -457,6 +460,12 @@ def _assert_segment_offsets(data: str, segs: list[_Seg]) -> None:
                     assert _clean_cell_text(raw) == seg.msgid
                 else:
                     assert seg.msgid == raw.strip()
+            elif seg.msgid:
+                # msgid normalises soft-wrapped lines; at minimum every word in msgid
+                # must appear in the raw span.
+                assert all(word in raw for word in seg.msgid.split()), (
+                    f"paragraph msgid word not found in span: {seg.msgid!r} vs {raw!r}"
+                )
 
 
 @pytest.mark.fuzz
@@ -471,7 +480,6 @@ def test_parse_qbk_fuzz_properties(data: str) -> None:
     _assert_segment_offsets(data, segs)
 
     result = _apply_translations(data, lambda s: s)
-    assert len(result) <= len(data)
     assert result == data
 
     store = QuickBookFile()
@@ -531,7 +539,9 @@ def test_fuzz_corpus_large_input() -> None:
 
 _SIZE_TOLERANCE = 0.02
 # Set after first CI measurement (2x observed peak on ubuntu-latest / Python 3.14).
-_PEAK_MEMORY_LIMIT_BYTES = 12 * 1024 * 1024
+_PEAK_MEMORY_LIMIT_BYTES = int(
+    os.environ.get("QBK_PEAK_MEMORY_LIMIT_BYTES", 12 * 1024 * 1024)
+)
 
 
 def _synthetic_block(n: int) -> str:

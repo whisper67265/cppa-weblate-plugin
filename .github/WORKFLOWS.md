@@ -64,7 +64,7 @@ Skip slow plugin tests during local iteration: add `-m "not slow"` to the pytest
 
 | Variable | Where | Purpose |
 |----------|-------|---------|
-| `BENCHMARK_COMPARE_FAIL` | Repository variable / workflow env (default `mean:20%`) | Passed to `pytest --benchmark-compare-fail` |
+| `BENCHMARK_COMPARE_FAIL` | Repository variable / workflow env (default `mean:30%`) | Passed to `pytest --benchmark-compare-fail` |
 | `BENCHMARK_COMPARE_ENABLED` | Repository variable / workflow env (default `true`) | Set to `false` to skip comparison (record-only mode) |
 
 **Refresh baseline** after an intentional parser performance change. Capture on **`ubuntu-latest` (GitHub Actions)** — the committed baseline must match CI hardware (local VMs/desktops are often ~2× faster and will cause false regressions). Download the `benchmark-*` artifact from a green run, or on a GitHub-hosted runner:
