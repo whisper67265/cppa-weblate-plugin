@@ -20,6 +20,8 @@ from io import BytesIO
 from pathlib import Path
 
 import pytest
+from hypothesis import given
+from hypothesis import strategies as st
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(_REPO_ROOT / "src"))
@@ -28,9 +30,13 @@ from translate.storage.pypo import pofile  # noqa: E402
 
 from boost_weblate.utils import quickbook as quickbook_mod  # noqa: E402
 from boost_weblate.utils.quickbook import (  # noqa: E402
+    _ADMONITION_KEYWORDS,
+    _HEADING_KEYWORDS,
     QuickBookFile,
     QuickBookTranslator,
     QuickBookUnit,
+    _apply_translations,
+    _clean_cell_text,
     _find_bracket_end,
     _has_prose,
     _parse_bracket_keyword,
@@ -363,6 +369,160 @@ def test_parse_table_inner_cell_bracket_extends_past_row() -> None:
     body = "T\n[[a][b [orphan]\n[[c][d]]"
     segs = _parse_table_inner(body, 0, len(body), 1, "table", 0)
     assert any(s.msgid == "c" for s in segs)
+
+
+# ---------------------------------------------------------------------------
+# Hypothesis fuzz strategies and property tests
+# ---------------------------------------------------------------------------
+
+_UNICODE_EDGE_CHARS = (
+    "\u200f\u202b\u202c"  # RTL marks
+    "\u200d\u200c"  # ZWJ / ZWNJ
+    "\u0301"  # combining acute
+    "\U0001f600"  # emoji
+)
+
+_qbk_safe_line = st.text(
+    alphabet=st.characters(codec="utf-8", blacklist_categories=("Cs",)),
+    min_size=0,
+    max_size=40,
+)
+
+qbk_arbitrary = st.text(min_size=0, max_size=1024)
+
+qbk_unicode_edge = st.text(
+    alphabet=st.characters(codec="utf-8", blacklist_categories=("Cs",))
+    | st.sampled_from(list(_UNICODE_EDGE_CHARS)),
+    min_size=0,
+    max_size=512,
+)
+
+
+@st.composite
+def _qbk_structured_leaf(draw: st.DrawFn) -> str:
+    text = draw(_qbk_safe_line)
+    kind = draw(
+        st.sampled_from(
+            ["plain", "heading", "template", "raw", "code", "list", "table"]
+        )
+    )
+    if kind == "plain":
+        return (text or "prose") + "\n"
+    if kind == "heading":
+        kw = draw(st.sampled_from(sorted(_HEADING_KEYWORDS)))
+        return f"[{kw} {text or 'Title'}]\n"
+    if kind == "template":
+        return f"[template {text or 'a'} {text or 'b'}]\n"
+    if kind == "raw":
+        return f"'''{text or 'raw'}'''\n"
+    if kind == "code":
+        return "    " + (text or "code") + "\n"
+    if kind == "list":
+        marker = draw(st.sampled_from(["*", "#"]))
+        return f"{marker} {text or 'item'}\n"
+    return f"[table\n{(text or 'Title')}\n[[a][{text or 'cell'}]]]\n"
+
+
+qbk_structured = st.recursive(
+    _qbk_structured_leaf(),
+    lambda children: st.one_of(
+        st.builds(
+            lambda body, title: f"[section {title}\n{body}]\n",
+            children,
+            _qbk_safe_line,
+        ),
+        st.builds(
+            lambda body, kw: f"[{kw} {body}]\n",
+            children,
+            st.sampled_from(sorted(_ADMONITION_KEYWORDS)),
+        ),
+        st.builds(lambda a, b: a + b, children, children),
+    ),
+    max_leaves=20,
+)
+
+_qbk_fuzz_inputs = qbk_arbitrary | qbk_structured | qbk_unicode_edge
+
+
+def _assert_segment_offsets(data: str, segs: list[_Seg]) -> None:
+    for seg in segs:
+        assert 0 <= seg.text_start <= seg.text_end <= len(data)
+        if seg.msgid:
+            raw = data[seg.text_start : seg.text_end]
+            assert raw.strip(), "non-empty msgid must map to non-whitespace span"
+            if seg.no_wrap:
+                if seg.seg_type in {"table", "variablelist"}:
+                    assert _clean_cell_text(raw) == seg.msgid
+                else:
+                    assert seg.msgid == raw.strip()
+
+
+@pytest.mark.fuzz
+@given(data=_qbk_fuzz_inputs)
+def test_parse_qbk_fuzz_properties(data: str) -> None:
+    """Parser safety, offset invariants, identity round-trip, and bounded output."""
+    segs = _parse_qbk(data)
+    if data.startswith("["):
+        _find_bracket_end(data, 0)
+
+    assert len(segs) <= len(data)
+    _assert_segment_offsets(data, segs)
+
+    result = _apply_translations(data, lambda s: s)
+    assert len(result) <= len(data)
+    assert result == data
+
+    store = QuickBookFile()
+    store.parse(data)
+    assert store.filesrc == data
+
+
+@pytest.mark.fuzz
+def test_fuzz_corpus_empty_input() -> None:
+    assert _parse_qbk("") == []
+    assert _apply_translations("", lambda s: s) == ""
+
+
+@pytest.mark.fuzz
+def test_fuzz_corpus_unclosed_brackets() -> None:
+    data = "[" * 5000
+    _parse_qbk(data)
+    assert _apply_translations(data, lambda s: s) == data
+
+
+@pytest.mark.fuzz
+def test_fuzz_corpus_section_depth_beyond_cap() -> None:
+    data = "[section " + "[nested\n" * 15 + "body\n" * 15
+    _parse_qbk(data)
+    assert _apply_translations(data, lambda s: s) == data
+
+
+@pytest.mark.fuzz
+def test_fuzz_corpus_rtl_wrapped_heading() -> None:
+    data = "\u200f[h2 Title\u200f]\n"
+    segs = _parse_qbk(data)
+    assert segs
+    assert _apply_translations(data, lambda s: s) == data
+
+
+@pytest.mark.fuzz
+def test_fuzz_corpus_invalid_utf8_raises_decode_error() -> None:
+    store = QuickBookFile()
+    with pytest.raises(UnicodeDecodeError):
+        store.parse(b"\xff\xfe")
+
+
+@pytest.mark.fuzz
+def test_fuzz_corpus_long_line() -> None:
+    data = "x" * 16384 + "\n"
+    assert _apply_translations(data, lambda s: s) == data
+
+
+@pytest.mark.fuzz
+def test_fuzz_corpus_large_input() -> None:
+    data = "[section title\n" + "paragraph line.\n" * 4000 + "]\n"
+    _parse_qbk(data)
+    assert _apply_translations(data, lambda s: s) == data
 
 
 def main(argv: list[str]) -> int:

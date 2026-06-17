@@ -33,6 +33,8 @@ jobs:
     - name: Install dependencies (incl. dev)
       run: uv sync --frozen --group dev --group pre-commit
     - name: Pytest with coverage
+      env:
+        HYPOTHESIS_PROFILE: ci
       run: >
         uv run --group dev --group pre-commit pytest -v --tb=short
         --cov=boost_weblate

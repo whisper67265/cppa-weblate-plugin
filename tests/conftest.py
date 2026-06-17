@@ -21,6 +21,27 @@ def pytest_configure() -> None:
     if src not in sys.path:
         sys.path.insert(0, src)
 
+    from datetime import timedelta
+
+    from hypothesis import HealthCheck
+    from hypothesis import settings as hypothesis_settings
+
+    hypothesis_settings.register_profile(
+        "ci",
+        max_examples=50,
+        deadline=timedelta(milliseconds=500),
+        suppress_health_check=[HealthCheck.too_slow],
+        derandomize=True,
+    )
+    hypothesis_settings.register_profile(
+        "dev",
+        max_examples=200,
+        deadline=timedelta(seconds=2),
+        suppress_health_check=[HealthCheck.too_slow],
+    )
+    profile = os.environ.get("HYPOTHESIS_PROFILE", "ci")
+    hypothesis_settings.load_profile(profile)
+
     # Always use bundled settings so a host ``DJANGO_SETTINGS_MODULE`` does not
     # break collection or ``python tests/formats/test_quickbook.py``.
     os.environ["DJANGO_SETTINGS_MODULE"] = "tests.django_qbk_format_settings"
