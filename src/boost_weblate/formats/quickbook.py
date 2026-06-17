@@ -2,12 +2,11 @@
 #
 # SPDX-License-Identifier: BSL-1.0
 
-"""QuickBook file format adapter for upstream Weblate.
+"""QuickBook file format for upstream Weblate.
 
-Thin :class:`~weblate.formats.convert.ConvertFormat` subclass that delegates
-parsing to :class:`~boost_weblate.utils.quickbook.QuickBookFile` and
-reconstruction to :class:`~boost_weblate.utils.quickbook.QuickBookTranslator`.
-Same control flow as ``AsciiDocFormat`` in ``weblate.formats.convert``.
+:class:`QuickBookFormat` subclasses both Weblate's ``ConvertFormat`` and the plugin
+:class:`~boost_weblate.formats.registry.RegisteredFormat` registry contract. Parsing and
+reconstruction delegate to :mod:`boost_weblate.utils.quickbook`.
 """
 
 from __future__ import annotations
@@ -18,6 +17,7 @@ from django.utils.translation import gettext_lazy
 from weblate.formats.convert import ConvertFormat
 from weblate.formats.helpers import NamedBytesIO
 
+from boost_weblate.formats.registry import RegisteredFormat, registry
 from boost_weblate.utils.quickbook import QuickBookFile, QuickBookTranslator
 
 if TYPE_CHECKING:
@@ -25,13 +25,17 @@ if TYPE_CHECKING:
     from weblate.formats.base import TranslationFormat
 
 
-class QuickBookFormat(ConvertFormat):
+@registry.register
+class QuickBookFormat(ConvertFormat, RegisteredFormat):
     """QuickBook (.qbk) documentation file format."""
+
+    format_id = "quickbook"
+    file_patterns = ("*.qbk",)
+    weblate_class = "boost_weblate.formats.quickbook.QuickBookFormat"
 
     # Translators: File format name
     name = gettext_lazy("QuickBook file")
-    autoload = ("*.qbk",)
-    format_id = "quickbook"
+    autoload = file_patterns
     monolingual = True
 
     def convertfile(

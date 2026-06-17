@@ -77,7 +77,7 @@ Do not duplicate pass-through vars in `environment:`; configure them once in `.e
 Build-time wiring (no env vars):
 
 1. **`settings_override.py`** is copied to `/app/data/settings-override.py` by the Dockerfile. Weblate's Docker entrypoint `exec()`s this file during settings load.
-2. **`WEBLATE_FORMATS`** — the override reads upstream `FormatsConf.FORMATS` via AST parse of `models.py`, appends `boost_weblate.formats.quickbook.QuickBookFormat`, and writes the result back to `WEBLATE_FORMATS`. No env var needed.
+2. **`WEBLATE_FORMATS`** — the override reads upstream `FormatsConf.FORMATS` via AST parse of `models.py`, merges paths from the plugin :class:`~boost_weblate.formats.registry.FormatRegistry` (``registry.weblate_class_paths()``), and writes the result back to `WEBLATE_FORMATS`. No env var needed.
 3. **`INSTALLED_APPS`** — the override appends `boost_weblate.endpoint.apps.BoostEndpointConfig`. The app's `ready()` hook then registers `/boost-endpoint/` routes on `weblate.urls.real_patterns`.
 
 Runtime plugin env vars (set in `.env`, read by `settings_override.py` at boot):

@@ -32,10 +32,11 @@ import os
 from pathlib import Path
 from typing import Any
 
-# Package ``__init__`` is empty; does not import ``formats.models``.
+# Package ``__init__`` loads the format registry; does not import ``formats.models``.
 import weblate.formats
 
-_QUICKBOOK_FORMAT = "boost_weblate.formats.quickbook.QuickBookFormat"
+from boost_weblate.formats import registry  # noqa: F401 — register plugin formats
+
 _ENDPOINT_APP_CONFIG = "boost_weblate.endpoint.apps.BoostEndpointConfig"
 
 
@@ -73,8 +74,8 @@ def _string_tuple_or_list(node: ast.expr) -> list[str]:
     raise RuntimeError(msg)
 
 
-def weblate_formats_with_quickbook() -> tuple[str, ...]:
-    """Upstream ``FormatsConf.FORMATS`` paths plus QuickBook.
+def weblate_formats_with_plugin_formats() -> tuple[str, ...]:
+    """Upstream ``FormatsConf.FORMATS`` paths plus plugin formats from the registry.
 
     Avoids importing ``weblate.formats.models``.
     """
@@ -90,12 +91,12 @@ def weblate_formats_with_quickbook() -> tuple[str, ...]:
     if not core:
         msg = f"boost_weblate: no format paths parsed from {models_py}"
         raise RuntimeError(msg)
-    if _QUICKBOOK_FORMAT in core:
-        return core
-    return core + (_QUICKBOOK_FORMAT,)
+    plugin_paths = registry.weblate_class_paths()
+    extra = tuple(path for path in plugin_paths if path not in core)
+    return core + extra
 
 
-WEBLATE_FORMATS = weblate_formats_with_quickbook()
+WEBLATE_FORMATS = weblate_formats_with_plugin_formats()
 
 _DEFAULT_BOOST_ENDPOINT_THROTTLE_RATES = {
     "info": "60/minute",

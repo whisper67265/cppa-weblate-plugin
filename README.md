@@ -85,7 +85,7 @@ flowchart TB
 
 - **`src/boost_weblate/settings_override.py`** — Docker `exec()` fragment: sets `WEBLATE_FORMATS` and appends `BoostEndpointConfig` to `INSTALLED_APPS`. Copied to `/app/data/settings-override.py` by the Dockerfile. See [WEBLATE_FORMATS configuration](#weblate_formats-configuration) and [WEBLATE_ADD_APPS](#weblate_add_apps).
 
-- **`src/boost_weblate/formats/`** — Weblate-facing **format classes** (subclasses of Weblate's `BaseFormat` family, such as `weblate.formats.convert.ConvertFormat`). `QuickBookFormat` follows the same pattern as built-in convert formats (for example AsciiDoc): it turns a template file into a translation store and, on save, applies translations back using the template plus the store.
+- **`src/boost_weblate/formats/`** — Weblate **format classes** and the plugin **format registry**. Each format is a single class (e.g. ``QuickBookFormat``) that subclasses both Weblate's ``ConvertFormat`` and the plugin :class:`~boost_weblate.formats.registry.RegisteredFormat` metadata contract, registered via :class:`~boost_weblate.formats.registry.FormatRegistry`.
 
 - **`src/boost_weblate/utils/`** — **Format-specific logic** with no Weblate import cycle: QuickBook parsing, segment extraction, translate-toolkit storage (`QuickBookFile` / `QuickBookUnit`), and reconstruction (`QuickBookTranslator`). New formats should add a sibling module (or package) here.
 
@@ -107,7 +107,14 @@ COPY settings-override.py /app/data/settings-override.py
 
 That path is fixed; Weblate does not scan `DATA_DIR` for arbitrary override files. The override file is **not** the same as `WEBLATE_PY_PATH` / `python/customize` (importable customization on `sys.path`); for format registration, use this exec hook unless your image explicitly imports another settings module. See the comments in `settings_override.py` for the full distinction.
 
-**Adding another format:** implement the class under `boost_weblate/formats/`, append its dotted class path in `weblate_formats_with_quickbook()` (or extend the tuple built there), redeploy, and restart Weblate. If upstream restructures `FormatsConf` in `models.py` (e.g. renames the class or moves `FORMATS` off a simple tuple assignment), update the AST helpers in `settings_override.py` accordingly.
+**Adding another format:** use the plugin :class:`~boost_weblate.formats.registry.FormatRegistry` (see ``boost_weblate/formats/registry.py``):
+
+1. Add parse/serialize logic under ``boost_weblate/utils/<format>.py``.
+2. Add ``formats/<format>.py`` with a ``<Format>Format`` class subclassing both Weblate's ``ConvertFormat`` and :class:`~boost_weblate.formats.registry.RegisteredFormat`, decorated with ``@registry.register``.
+3. Add a ``registry.register_entry(...)`` call in ``boost_weblate/formats/__init__.py`` (metadata only — avoids importing ``ConvertFormat`` during settings bootstrap).
+4. Add tests under ``tests/formats/`` and ``tests/utils/``, redeploy, and restart Weblate.
+
+If upstream restructures ``FormatsConf`` in ``models.py`` (e.g. renames the class or moves ``FORMATS`` off a simple tuple assignment), update the AST helpers in ``settings_override.py`` accordingly.
 
 ## WEBLATE_ADD_APPS
 

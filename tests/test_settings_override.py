@@ -12,7 +12,11 @@ from pathlib import Path
 
 import pytest
 
-_QBK = "boost_weblate.formats.quickbook.QuickBookFormat"
+from boost_weblate.formats import registry
+
+
+def _plugin_weblate_paths() -> tuple[str, ...]:
+    return registry.weblate_class_paths()
 
 
 def _load_weblate_formats_models_source() -> str:
@@ -27,21 +31,22 @@ def _load_weblate_formats_models_source() -> str:
 def test_settings_override_formats_match_ast_parse_of_upstream() -> None:
     from boost_weblate.settings_override import (
         _parse_formatsconf_formats_ast,
-        weblate_formats_with_quickbook,
+        weblate_formats_with_plugin_formats,
     )
 
     stock = _parse_formatsconf_formats_ast(_load_weblate_formats_models_source())
-    got = weblate_formats_with_quickbook()
+    got = weblate_formats_with_plugin_formats()
+    plugin_paths = _plugin_weblate_paths()
     assert got[: len(stock)] == tuple(stock)
-    assert got[len(stock)] == _QBK
-    assert len(got) == len(stock) + 1
+    assert got[len(stock) :] == plugin_paths
+    assert len(got) == len(stock) + len(plugin_paths)
 
 
 def test_settings_override_module_defines_weblate_formats() -> None:
     import boost_weblate.settings_override as so
 
     assert isinstance(so.WEBLATE_FORMATS, tuple)
-    assert so.WEBLATE_FORMATS == so.weblate_formats_with_quickbook()
+    assert so.WEBLATE_FORMATS == so.weblate_formats_with_plugin_formats()
 
 
 def test_settings_override_source_has_exec_docker_hints() -> None:
@@ -54,14 +59,20 @@ def test_settings_override_source_has_exec_docker_hints() -> None:
     assert "AppRegistryNotReady" in text or "formats.models" in text
 
 
-def test_weblate_formats_includes_upstream_and_quickbook() -> None:
-    from boost_weblate.settings_override import weblate_formats_with_quickbook
+def test_weblate_formats_includes_upstream_and_plugin_formats() -> None:
+    from boost_weblate.settings_override import (
+        _parse_formatsconf_formats_ast,
+        weblate_formats_with_plugin_formats,
+    )
 
-    paths = list(weblate_formats_with_quickbook())
-    assert len(paths) >= 40
+    stock = _parse_formatsconf_formats_ast(_load_weblate_formats_models_source())
+    paths = list(weblate_formats_with_plugin_formats())
+    plugin_paths = _plugin_weblate_paths()
+    assert len(paths) >= len(stock)
     assert "weblate.formats.ttkit.PoFormat" in paths
     assert "weblate.formats.ttkit.TBXFormat" in paths
-    assert paths.count(_QBK) == 1
+    for plugin_path in plugin_paths:
+        assert paths.count(plugin_path) == 1
 
 
 def test_merge_boost_endpoint_throttle_rates_preserves_upstream() -> None:
