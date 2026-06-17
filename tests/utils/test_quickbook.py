@@ -691,27 +691,19 @@ def test_benchmark_quickbook_file_parse(benchmark) -> None:
 
 
 @pytest.mark.benchmark
-def test_parse_1mb_peak_memory(benchmark) -> None:
+def test_parse_1mb_peak_memory() -> None:
     target_bytes = 1024 * 1024
     text = generate_synthetic_qbk(target_bytes)
     _assert_synthetic_qbk_valid(text, target_bytes)
-    peaks: list[int] = []
-
-    def _run() -> list:
-        tracemalloc.start()
-        try:
-            return _parse_qbk(text)
-        finally:
-            _current, peak = tracemalloc.get_traced_memory()
-            peaks.append(peak)
-            tracemalloc.stop()
-
-    result = benchmark(_run)
-    assert result
-    peak = max(peaks)
-    benchmark.extra_info["peak_bytes"] = peak
-    benchmark.extra_info["peak_mib"] = round(peak / (1024 * 1024), 2)
-    assert peak < _PEAK_MEMORY_LIMIT_BYTES, f"peak={peak}"
+    tracemalloc.start()
+    try:
+        _parse_qbk(text)
+        _current, peak = tracemalloc.get_traced_memory()
+    finally:
+        tracemalloc.stop()
+    assert peak < _PEAK_MEMORY_LIMIT_BYTES, (
+        f"peak={peak} ({peak / (1024 * 1024):.2f} MiB)"
+    )
 
 
 def main(argv: list[str]) -> int:

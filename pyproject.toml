@@ -86,7 +86,8 @@ Repository = "https://github.com/cppalliance/cppa-weblate-plugin"
 ignore = [
   "*.yaml",
   "*.yml",
-  ".editorconfig"
+  ".editorconfig",
+  ".benchmarks/**"
 ]
 
 [tool.coverage]

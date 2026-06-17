@@ -67,13 +67,16 @@ Skip slow plugin tests during local iteration: add `-m "not slow"` to the pytest
 | `BENCHMARK_COMPARE_FAIL` | Repository variable / workflow env (default `mean:20%`) | Passed to `pytest --benchmark-compare-fail` |
 | `BENCHMARK_COMPARE_ENABLED` | Repository variable / workflow env (default `true`) | Set to `false` to skip comparison (record-only mode) |
 
-**Refresh baseline** after an intentional parser performance change (on `ubuntu-latest`, Python 3.14):
+**Refresh baseline** after an intentional parser performance change. Capture on **`ubuntu-latest` (GitHub Actions)** — the committed baseline must match CI hardware (local VMs/desktops are often ~2× faster and will cause false regressions). Download the `benchmark-*` artifact from a green run, or on a GitHub-hosted runner:
 
 ```bash
 uv run --group dev pytest -m benchmark --benchmark-only \
+  -k "not peak_memory" \
   --benchmark-save=baseline tests/utils/test_quickbook.py
 git add .benchmarks/Linux-CPython-3.14-64bit/0001_baseline.json
 ```
+
+Peak-memory bounds are checked separately (`test_parse_1mb_peak_memory`); they are not part of the timing baseline compare.
 
 If CI Python version changes, the `.benchmarks/Linux-CPython-*` directory name changes — regenerate and commit the new baseline path (update `.gitignore` exceptions if needed).
 

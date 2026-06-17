@@ -387,15 +387,17 @@ Compare against the committed baseline and fail on regression (default 20% mean)
 
 ```bash
 uv run --group dev pytest -m benchmark --benchmark-only -v \
+  -k "not peak_memory" \
   --benchmark-compare=0001 \
   --benchmark-compare-fail=mean:20% \
   tests/utils/test_quickbook.py
 ```
 
-Refresh the baseline after an intentional parser change (on `ubuntu-latest` with Python 3.14):
+Refresh the baseline after an intentional parser change. **Capture on `ubuntu-latest` (GitHub Actions)** — local machines are often faster and will not match CI. Easiest path: download the `benchmark-*` artifact from a green `ci-benchmark` run, copy its `benchmark-results.json` over `0001_baseline.json` (parse-timing benchmarks only), or re-run on a GitHub-hosted runner:
 
 ```bash
 uv run --group dev pytest -m benchmark --benchmark-only \
+  -k "not peak_memory" \
   --benchmark-save=baseline tests/utils/test_quickbook.py
 ```
 
@@ -405,10 +407,10 @@ Commit the updated `.benchmarks/Linux-CPython-3.14-64bit/0001_baseline.json`. If
 
 | Size | Mean `_parse_qbk` time | Segments |
 |------|------------------------|----------|
-| 100 KB | ~0.019 s | ~1,200 |
-| 500 KB | ~0.12 s | ~6,100 |
-| 1 MB | ~0.29 s | ~12,200 |
-| 1 MB `QuickBookFile.parse` | ~0.31 s | (units ≈ segments) |
+| 100 KB | ~0.042 s | ~1,200 |
+| 500 KB | ~0.23 s | ~6,100 |
+| 1 MB | ~0.48 s | ~12,200 |
+| 1 MB `QuickBookFile.parse` | ~0.55 s | (units ≈ segments) |
 | 1 MB peak memory (`tracemalloc`) | ~5.3 MiB | — |
 
 CI sets `BENCHMARK_COMPARE_FAIL` (default `mean:20%`) and `BENCHMARK_COMPARE_ENABLED` (default `true`; set `false` for record-only runs). See [`.github/WORKFLOWS.md`](.github/WORKFLOWS.md).

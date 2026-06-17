@@ -46,8 +46,12 @@ jobs:
         fi
         uv run --group dev pytest -m benchmark --benchmark-only -v \
           --benchmark-json=benchmark-results.json \
+          -k "not peak_memory" \
           "${compare_args[@]}" \
           tests/utils/test_quickbook.py
+        uv run --group dev pytest -m benchmark -v \
+          -k "peak_memory" \
+          tests/utils/test_quickbook.py 2>&1 | tee peak-memory.log
     - name: Benchmark summary
       if: always()
       run: |
@@ -80,6 +84,11 @@ jobs:
             print(
                 f"| {name} | {mean_s:.4f} | {min_s:.4f} | {max_s:.4f} |"
             )
+        peak_log = Path("peak-memory.log")
+        if peak_log.is_file():
+            print()
+            print("Peak memory test log:")
+            print(peak_log.read_text(encoding="utf-8"))
         PY
     # actions/upload-artifact v4.6.2
     - name: Upload benchmark results
