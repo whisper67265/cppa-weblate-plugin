@@ -15,7 +15,9 @@ Or with an explicit QuickBook path::
 
 from __future__ import annotations
 
+import functools
 import sys
+import tracemalloc
 from io import BytesIO
 from pathlib import Path
 
@@ -523,6 +525,193 @@ def test_fuzz_corpus_large_input() -> None:
     data = "[section title\n" + "paragraph line.\n" * 4000 + "]\n"
     _parse_qbk(data)
     assert _apply_translations(data, lambda s: s) == data
+
+
+# --- Benchmarks ---
+
+_SIZE_TOLERANCE = 0.02
+# Set after first CI measurement (2x observed peak on ubuntu-latest / Python 3.14).
+_PEAK_MEMORY_LIMIT_BYTES = 12 * 1024 * 1024
+
+
+def _synthetic_block(n: int) -> str:
+    return f"""[template api_{n} [link beast.ref.boost__beast__http__message `message`]]
+
+[section:sec_{n} Section title {n}]
+
+Opening paragraph with [@https://example.com/doc/rfc{n} RFC-style link] and
+[link beast.ref.boost__beast__http__request `request`] in prose.
+
+[h2 Section headings and lists]
+
+* First bullet names [link beast.ref.boost__beast__http__response `response`].
+* Second bullet continues with plain prose.
+
+[#anchor_{n}]
+
+[heading:custom_{n} Custom heading with id]
+
+[:This is a single-line blockquote for translation.]
+
+[note
+Multi-line admonition body for section {n}.
+A second paragraph inside the same note uses
+[@https://tools.ietf.org/html/rfc6455 WebSocket] markup.
+]
+
+[section:nested_{n} Nested section title here]
+
+Inner section prose explains that `template` parameters accept any
+[link beast.ref.boost__beast__http__fields `fields`] type meeting requirements.
+
+    // Indented code block (non-translatable).
+    // template<class Body, class Fields>
+    // class message;
+
+After the code block, prose resumes with a dollar image that is skipped:
+[$beast/images/message.png [width 100px] [height 50px]]
+
+[funcref boost::beast::http::message Reference to message type]
+
+[endsect]
+
+[table Message patterns {n}
+[[Name][Description]]
+[[
+    __message__
+][
+    ```
+    /// Class template overview
+    template<class Body, class Fields>
+    class message;
+    ```
+]]
+[[
+    [link beast.ref.boost__beast__http__request `request`]
+][
+    ```
+    /// HTTP request alias
+    template<class Body, class Fields = fields>
+    using request = message<true, Body, Fields>;
+    ```
+]]
+[[Plain prose cell][
+    This cell has human-readable text only, without a code fence.
+]]
+]
+
+[variablelist FAQ-style entries {n}
+[[
+    "Does section {n} include a variablelist?"
+][
+    Yes. This pair mimics patterns from the FAQ chapter.
+
+    Second paragraph in the same answer cell.
+]]
+]
+
+[warning This is a one-line warning about edge cases in section {n}.]
+
+[endsect]
+"""
+
+
+@functools.lru_cache(maxsize=8)
+def generate_synthetic_qbk(target_bytes: int) -> str:
+    if target_bytes <= 0:
+        raise ValueError("target_bytes must be positive")
+    low = int(target_bytes * (1 - _SIZE_TOLERANCE))
+    high = int(target_bytes * (1 + _SIZE_TOLERANCE))
+    header = "[quickbook 1.7]\n\n"
+    header_len = len(header.encode("utf-8"))
+    block_size = len(_synthetic_block(0).encode("utf-8"))
+    num_blocks = max(1, (target_bytes - header_len) // block_size)
+    filler = "[/ sizing filler]\n"
+    filler_size = len(filler.encode("utf-8"))
+
+    while num_blocks >= 1:
+        parts = [header]
+        for i in range(num_blocks):
+            parts.append(_synthetic_block(i))
+        actual = len("".join(parts).encode("utf-8"))
+        while actual < low:
+            parts.append(filler)
+            actual += filler_size
+        text = "".join(parts)
+        actual = len(text.encode("utf-8"))
+        if actual <= high:
+            return text
+        num_blocks -= 1
+
+    raise RuntimeError(
+        f"could not generate synthetic qbk within "
+        f"±{_SIZE_TOLERANCE:.0%} of {target_bytes}"
+    )
+
+
+def _assert_synthetic_qbk_valid(text: str, target_bytes: int) -> list[_Seg]:
+    actual = len(text.encode("utf-8"))
+    low = int(target_bytes * (1 - _SIZE_TOLERANCE))
+    high = int(target_bytes * (1 + _SIZE_TOLERANCE))
+    assert low <= actual <= high, f"size {actual} not within [{low}, {high}]"
+    segs = _parse_qbk(text)
+    assert segs, "synthetic qbk must yield translatable segments"
+    return segs
+
+
+@pytest.mark.benchmark
+@pytest.mark.parametrize("target_kb", [100, 500, 1000])
+def test_benchmark_parse_qbk(benchmark, target_kb: int) -> None:
+    target_bytes = target_kb * 1024
+    text = generate_synthetic_qbk(target_bytes)
+    segs = _assert_synthetic_qbk_valid(text, target_bytes)
+    benchmark.extra_info["target_kb"] = target_kb
+    benchmark.extra_info["byte_len"] = len(text.encode("utf-8"))
+    benchmark.extra_info["segment_count"] = len(segs)
+    result = benchmark(_parse_qbk, text)
+    assert result
+
+
+@pytest.mark.benchmark
+def test_benchmark_quickbook_file_parse(benchmark) -> None:
+    target_bytes = 1024 * 1024
+    text = generate_synthetic_qbk(target_bytes)
+    segs = _assert_synthetic_qbk_valid(text, target_bytes)
+
+    def _run() -> int:
+        store = QuickBookFile()
+        store.parse(text)
+        return len(store.units)
+
+    benchmark.extra_info["target_kb"] = 1024
+    benchmark.extra_info["byte_len"] = len(text.encode("utf-8"))
+    benchmark.extra_info["segment_count"] = len(segs)
+    unit_count = benchmark(_run)
+    assert unit_count > 0
+
+
+@pytest.mark.benchmark
+def test_parse_1mb_peak_memory(benchmark) -> None:
+    target_bytes = 1024 * 1024
+    text = generate_synthetic_qbk(target_bytes)
+    _assert_synthetic_qbk_valid(text, target_bytes)
+    peaks: list[int] = []
+
+    def _run() -> list:
+        tracemalloc.start()
+        try:
+            return _parse_qbk(text)
+        finally:
+            _current, peak = tracemalloc.get_traced_memory()
+            peaks.append(peak)
+            tracemalloc.stop()
+
+    result = benchmark(_run)
+    assert result
+    peak = max(peaks)
+    benchmark.extra_info["peak_bytes"] = peak
+    benchmark.extra_info["peak_mib"] = round(peak / (1024 * 1024), 2)
+    assert peak < _PEAK_MEMORY_LIMIT_BYTES, f"peak={peak}"
 
 
 def main(argv: list[str]) -> int:

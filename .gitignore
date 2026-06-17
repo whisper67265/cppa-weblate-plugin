@@ -26,6 +26,10 @@ dist/
 
 # Testing / coverage
 .pytest_cache/
+.benchmarks/*
+!.benchmarks/Linux-CPython-3.14-64bit/
+!.benchmarks/Linux-CPython-3.14-64bit/0001_baseline.json
+benchmark-results.json
 .coverage
 coverage.xml
 htmlcov/

@@ -279,12 +279,13 @@ The service has no plugin-owned models; it operates entirely through Weblate's D
 
 ### CI (`ci.yml`)
 
-Triggered on push and PR to `main` and `develop`. Calls eight reusable sub-workflows:
+Triggered on push and PR to `main` and `develop`. Calls nine reusable sub-workflows:
 
 | Job | Workflow | What it checks |
 |-----|----------|----------------|
 | `lint` | [`.github/workflows/ci-lint.yml`](.github/workflows/ci-lint.yml) | prek (Ruff, YAML/TOML, REUSE, actionlint, pytest) |
 | `test` | [`.github/workflows/ci-test.yml`](.github/workflows/ci-test.yml) | pytest + 90% coverage gate (`--cov-fail-under=90`) |
+| `benchmark` | [`.github/workflows/ci-benchmark.yml`](.github/workflows/ci-benchmark.yml) | QuickBook parser benchmarks (`pytest-benchmark`); JSON artifact; optional regression gate vs `.benchmarks/` baseline |
 | `package` | [`.github/workflows/ci-package.yml`](.github/workflows/ci-package.yml) | `uv build`, twine, pydistcheck, pyroma, check-wheel-contents, check-manifest |
 | `dependencies` | [`.github/workflows/ci-dependencies.yml`](.github/workflows/ci-dependencies.yml) | pip-audit, liccheck, dependency review (on PRs) |
 | `weblate-pin` | [`.github/workflows/ci-weblate-pin.yml`](.github/workflows/ci-weblate-pin.yml) | PyPI `Weblate[all]==…` in `pyproject.toml` matches Docker `FROM weblate/weblate:…` (`scripts/check-weblate-pin-sync.sh`) |
@@ -375,6 +376,42 @@ pytest -v --tb=short \
 ```
 
 (`coverage.xml`, `htmlcov/`, and `.coverage` are gitignored; open `htmlcov/index.html` locally to browse line coverage.)
+
+- **Parser benchmarks:** QuickBook parse-time and memory baselines live in [`tests/utils/test_quickbook.py`](tests/utils/test_quickbook.py) (`@pytest.mark.benchmark`). They are excluded from default pytest runs and pre-commit. Run locally:
+
+```bash
+uv run --group dev pytest -m benchmark --benchmark-only -v tests/utils/test_quickbook.py
+```
+
+Compare against the committed baseline and fail on regression (default 20% mean):
+
+```bash
+uv run --group dev pytest -m benchmark --benchmark-only -v \
+  --benchmark-compare=0001 \
+  --benchmark-compare-fail=mean:20% \
+  tests/utils/test_quickbook.py
+```
+
+Refresh the baseline after an intentional parser change (on `ubuntu-latest` with Python 3.14):
+
+```bash
+uv run --group dev pytest -m benchmark --benchmark-only \
+  --benchmark-save=baseline tests/utils/test_quickbook.py
+```
+
+Commit the updated `.benchmarks/Linux-CPython-3.14-64bit/0001_baseline.json`. If CI Python changes, regenerate the baseline (the platform directory name changes).
+
+**Observed baselines** (`ubuntu-latest`, Python 3.14, synthetic documents):
+
+| Size | Mean `_parse_qbk` time | Segments |
+|------|------------------------|----------|
+| 100 KB | ~0.019 s | ~1,200 |
+| 500 KB | ~0.12 s | ~6,100 |
+| 1 MB | ~0.29 s | ~12,200 |
+| 1 MB `QuickBookFile.parse` | ~0.31 s | (units ≈ segments) |
+| 1 MB peak memory (`tracemalloc`) | ~5.3 MiB | — |
+
+CI sets `BENCHMARK_COMPARE_FAIL` (default `mean:20%`) and `BENCHMARK_COMPARE_ENABLED` (default `true`; set `false` for record-only runs). See [`.github/WORKFLOWS.md`](.github/WORKFLOWS.md).
 
 - **Pull requests:** open PRs against the default branch on GitHub. Keep changes focused; ensure CI is green. Respond to review feedback on the PR thread; for design questions or bug reports, use [Issues](https://github.com/cppalliance/cppa-weblate-plugin/issues).
 

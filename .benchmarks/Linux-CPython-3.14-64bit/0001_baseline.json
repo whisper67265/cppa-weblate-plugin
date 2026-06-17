@@ -1,0 +1,335 @@
+{
+    "machine_info": {
+        "node": "dsf2eqw1-VirtualBox",
+        "processor": "x86_64",
+        "machine": "x86_64",
+        "python_compiler": "Clang 21.1.4 ",
+        "python_implementation": "CPython",
+        "python_implementation_version": "3.14.3",
+        "python_version": "3.14.3",
+        "python_build": [
+            "main",
+            "Mar  3 2026 14:59:53"
+        ],
+        "release": "6.17.0-35-generic",
+        "system": "Linux",
+        "cpu": {
+            "python_version": "3.14.3.final.0 (64 bit)",
+            "cpuinfo_version": [
+                9,
+                0,
+                0
+            ],
+            "cpuinfo_version_string": "9.0.0",
+            "arch": "X86_64",
+            "bits": 64,
+            "count": 4,
+            "arch_string_raw": "x86_64",
+            "vendor_id_raw": "GenuineIntel",
+            "brand_raw": "12th Gen Intel(R) Core(TM) i5-12400F",
+            "hz_advertised_friendly": "2.4960 GHz",
+            "hz_actual_friendly": "2.4960 GHz",
+            "hz_advertised": [
+                2496002000,
+                0
+            ],
+            "hz_actual": [
+                2496002000,
+                0
+            ],
+            "stepping": 5,
+            "model": 151,
+            "family": 6,
+            "flags": [
+                "3dnowprefetch",
+                "abm",
+                "adx",
+                "aes",
+                "apic",
+                "arat",
+                "arch_capabilities",
+                "avx",
+                "avx2",
+                "bmi1",
+                "bmi2",
+                "clflush",
+                "clflushopt",
+                "cmov",
+                "constant_tsc",
+                "cpuid",
+                "cx16",
+                "cx8",
+                "de",
+                "f16c",
+                "flush_l1d",
+                "fma",
+                "fpu",
+                "fsgsbase",
+                "fxsr",
+                "ht",
+                "hypervisor",
+                "invpcid",
+                "lahf_lm",
+                "lm",
+                "mca",
+                "mce",
+                "md_clear",
+                "mmx",
+                "movbe",
+                "msr",
+                "mtrr",
+                "nonstop_tsc",
+                "nopl",
+                "nx",
+                "osxsave",
+                "pae",
+                "pat",
+                "pcid",
+                "pclmulqdq",
+                "pge",
+                "pni",
+                "popcnt",
+                "pse",
+                "pse36",
+                "rdrand",
+                "rdrnd",
+                "rdseed",
+                "rdtscp",
+                "rep_good",
+                "sep",
+                "sha",
+                "sha_ni",
+                "sse",
+                "sse2",
+                "sse4_1",
+                "sse4_2",
+                "ssse3",
+                "syscall",
+                "tsc",
+                "tsc_known_freq",
+                "vme",
+                "x2apic",
+                "xsave",
+                "xtopology"
+            ],
+            "l3_cache_size": 18874368,
+            "l2_cache_size": 5242880,
+            "l1_data_cache_size": 196608,
+            "l1_instruction_cache_size": 131072,
+            "l2_cache_line_size": 1280,
+            "l2_cache_associativity": 7
+        }
+    },
+    "commit_info": {
+        "id": "66d1f92d68c27abbbd1823f0f7dec0ea50b4d61d",
+        "time": "2026-06-17T15:43:44-06:00",
+        "author_time": "2026-06-17T15:43:44-06:00",
+        "dirty": true,
+        "project": "cppa-weblate-plugin",
+        "branch": "feature/harden-quickbook-format"
+    },
+    "benchmarks": [
+        {
+            "group": null,
+            "name": "test_benchmark_parse_qbk[100]",
+            "fullname": "tests/utils/test_quickbook.py::test_benchmark_parse_qbk[100]",
+            "params": {
+                "target_kb": 100
+            },
+            "param": "100",
+            "extra_info": {
+                "target_kb": 100,
+                "byte_len": 100985,
+                "segment_count": 1196
+            },
+            "options": {
+                "disable_gc": false,
+                "timer": "perf_counter",
+                "min_rounds": 5,
+                "max_time": 1.0,
+                "min_time": 5e-06,
+                "warmup": false
+            },
+            "stats": {
+                "min": 0.01751466199857532,
+                "max": 0.023963931998878252,
+                "mean": 0.018866551249954813,
+                "stddev": 0.0014902710473217058,
+                "rounds": 56,
+                "median": 0.018310202500288142,
+                "iqr": 0.0006388005003827857,
+                "q1": 0.0181094090003171,
+                "q3": 0.018748209500699886,
+                "iqr_outliers": 8,
+                "stddev_outliers": 8,
+                "outliers": "8;8",
+                "ld15iqr": 0.01751466199857532,
+                "hd15iqr": 0.020929131998855155,
+                "ops": 53.00385781966352,
+                "total": 1.0565268699974695,
+                "iterations": 1
+            }
+        },
+        {
+            "group": null,
+            "name": "test_benchmark_parse_qbk[500]",
+            "fullname": "tests/utils/test_quickbook.py::test_benchmark_parse_qbk[500]",
+            "params": {
+                "target_kb": 500
+            },
+            "param": "500",
+            "extra_info": {
+                "target_kb": 500,
+                "byte_len": 517037,
+                "segment_count": 6095
+            },
+            "options": {
+                "disable_gc": false,
+                "timer": "perf_counter",
+                "min_rounds": 5,
+                "max_time": 1.0,
+                "min_time": 5e-06,
+                "warmup": false
+            },
+            "stats": {
+                "min": 0.11338472400166211,
+                "max": 0.15751263799756998,
+                "mean": 0.12326894633345849,
+                "stddev": 0.014137117143910001,
+                "rounds": 9,
+                "median": 0.11726625000301283,
+                "iqr": 0.012546036002277106,
+                "q1": 0.11441814999852795,
+                "q3": 0.12696418600080506,
+                "iqr_outliers": 1,
+                "stddev_outliers": 1,
+                "outliers": "1;1",
+                "ld15iqr": 0.11338472400166211,
+                "hd15iqr": 0.15751263799756998,
+                "ops": 8.112343211686667,
+                "total": 1.1094205170011264,
+                "iterations": 1
+            }
+        },
+        {
+            "group": null,
+            "name": "test_benchmark_parse_qbk[1000]",
+            "fullname": "tests/utils/test_quickbook.py::test_benchmark_parse_qbk[1000]",
+            "params": {
+                "target_kb": 1000
+            },
+            "param": "1000",
+            "extra_info": {
+                "target_kb": 1000,
+                "byte_len": 1035377,
+                "segment_count": 12190
+            },
+            "options": {
+                "disable_gc": false,
+                "timer": "perf_counter",
+                "min_rounds": 5,
+                "max_time": 1.0,
+                "min_time": 5e-06,
+                "warmup": false
+            },
+            "stats": {
+                "min": 0.27974406800058205,
+                "max": 0.30065151099915965,
+                "mean": 0.2875550253993424,
+                "stddev": 0.008641744062652917,
+                "rounds": 5,
+                "median": 0.28335159799826215,
+                "iqr": 0.012570406250233646,
+                "q1": 0.28152472549936647,
+                "q3": 0.2940951317496001,
+                "iqr_outliers": 0,
+                "stddev_outliers": 1,
+                "outliers": "1;0",
+                "ld15iqr": 0.27974406800058205,
+                "hd15iqr": 0.30065151099915965,
+                "ops": 3.4775952832375254,
+                "total": 1.437775126996712,
+                "iterations": 1
+            }
+        },
+        {
+            "group": null,
+            "name": "test_benchmark_quickbook_file_parse",
+            "fullname": "tests/utils/test_quickbook.py::test_benchmark_quickbook_file_parse",
+            "params": null,
+            "param": null,
+            "extra_info": {
+                "target_kb": 1024,
+                "byte_len": 1058849,
+                "segment_count": 12466
+            },
+            "options": {
+                "disable_gc": false,
+                "timer": "perf_counter",
+                "min_rounds": 5,
+                "max_time": 1.0,
+                "min_time": 5e-06,
+                "warmup": false
+            },
+            "stats": {
+                "min": 0.29763377100243815,
+                "max": 0.3298624990020471,
+                "mean": 0.3125961964018643,
+                "stddev": 0.013094172418396083,
+                "rounds": 5,
+                "median": 0.3149913490015024,
+                "iqr": 0.020919313749800494,
+                "q1": 0.3006623880019106,
+                "q3": 0.3215817017517111,
+                "iqr_outliers": 0,
+                "stddev_outliers": 2,
+                "outliers": "2;0",
+                "ld15iqr": 0.29763377100243815,
+                "hd15iqr": 0.3298624990020471,
+                "ops": 3.1990152519784023,
+                "total": 1.5629809820093215,
+                "iterations": 1
+            }
+        },
+        {
+            "group": null,
+            "name": "test_parse_1mb_peak_memory",
+            "fullname": "tests/utils/test_quickbook.py::test_parse_1mb_peak_memory",
+            "params": null,
+            "param": null,
+            "extra_info": {
+                "peak_bytes": 5520128,
+                "peak_mib": 5.26
+            },
+            "options": {
+                "disable_gc": false,
+                "timer": "perf_counter",
+                "min_rounds": 5,
+                "max_time": 1.0,
+                "min_time": 5e-06,
+                "warmup": false
+            },
+            "stats": {
+                "min": 2.051324186002603,
+                "max": 2.0777949029979936,
+                "mean": 2.0619116800000485,
+                "stddev": 0.010538110908051684,
+                "rounds": 5,
+                "median": 2.062737164000282,
+                "iqr": 0.014862173499750497,
+                "q1": 2.0528471044999606,
+                "q3": 2.067709277999711,
+                "iqr_outliers": 0,
+                "stddev_outliers": 2,
+                "outliers": "2;0",
+                "ld15iqr": 2.051324186002603,
+                "hd15iqr": 2.0777949029979936,
+                "ops": 0.4849868254298732,
+                "total": 10.309558400000242,
+                "iterations": 1
+            }
+        }
+    ],
+    "datetime": "2026-06-17T21:55:36.201696+00:00",
+    "version": "5.2.3"
+}

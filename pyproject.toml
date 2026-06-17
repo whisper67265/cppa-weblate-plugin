@@ -10,6 +10,7 @@ requires = ["uv_build>=0.11.19,<0.12.0"]
 dev = [
   "coverage[toml]==7.14.1",
   "hypothesis==6.155.3",
+  "pytest-benchmark==5.2.3",
   "pytest-cov==7.1.0"
 ]
 lint = [
@@ -135,8 +136,9 @@ level = "cautious"
 unauthorized_licenses = []
 
 [tool.pytest.ini_options]
-addopts = ["-m", "not plugin"]
+addopts = ["-m", "not plugin and not benchmark"]
 markers = [
+  "benchmark: parser performance benchmarks (slow; excluded from default test runs)",
   "plugin: requires live Weblate stack (Docker Compose) and optional WEBLATE_API_TOKEN",
   "slow: long-running plugin integration test",
   "fuzz: property-based / fuzz tests (may be slow locally)"
@@ -145,6 +147,10 @@ python_classes = ["Test*"]
 python_files = ["test_*.py", "*_test.py"]
 pythonpath = ["src", "."]
 testpaths = ["tests"]
+
+[tool.pytest-benchmark]
+min_rounds = 5
+warmup = true
 
 [tool.ruff]
 line-length = 88
