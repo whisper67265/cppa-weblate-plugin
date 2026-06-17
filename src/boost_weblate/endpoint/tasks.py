@@ -18,9 +18,14 @@ from boost_weblate.endpoint.errors import (
     wrap_task_error,
 )
 from boost_weblate.endpoint.services import BoostComponentService
+from boost_weblate.utils.task_lock import (
+    build_add_or_update_lock_key,
+    redis_task_lock,
+)
 
 
 @app.task(trail=False)
+@redis_task_lock(key_builder=build_add_or_update_lock_key)
 def boost_add_or_update_task(
     *,
     organization: str,

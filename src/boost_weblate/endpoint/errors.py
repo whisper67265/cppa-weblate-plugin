@@ -31,6 +31,7 @@ class BoostEndpointErrorCode(StrEnum):
     REQUIRED_FIELD = "required_field"
     TASK_USER_NOT_FOUND = "task_user_not_found"
     TASK_INTERNAL_ERROR = "task_internal_error"
+    TASK_DUPLICATE = "task_duplicate"
 
 
 class BoostEndpointError(WeblateError):

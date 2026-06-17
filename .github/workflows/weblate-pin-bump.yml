@@ -29,6 +29,8 @@ jobs:
     - uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39
       with:
         version: 0.11.12
+    - name: Install apt dependencies (Weblate venv)
+      run: sudo ./.github/ci/apt-install
     - name: Resolve and apply Weblate bump
       id: bump
       env:
