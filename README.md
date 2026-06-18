@@ -383,7 +383,7 @@ pytest -v --tb=short \
 uv run --group dev pytest -m benchmark --benchmark-only -v tests/utils/test_quickbook.py
 ```
 
-Compare against the committed baseline and fail on regression (default 20% mean):
+Compare against the committed baseline and fail on regression (default 30% mean):
 
 ```bash
 uv run --group dev pytest -m benchmark --benchmark-only -v \
