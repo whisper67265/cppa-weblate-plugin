@@ -18,6 +18,8 @@ SPDX-License-Identifier: BSL-1.0
 | ---------- | ------ | -------- |
 | QuickBook  | `boost_weblate.formats.quickbook` | Implemented |
 
+Parser-supported QuickBook constructs, coverage against Boost libraries, and known limitations are documented in [docs/quickbook-grammar.md](docs/quickbook-grammar.md).
+
 Additional formats should follow the same split: a thin class under `src/boost_weblate/formats/` that plugs into Weblate's format APIs, with parsing and reconstruction under `src/boost_weblate/utils/`.
 
 ## Quick Start
@@ -346,6 +348,7 @@ Each script builds `docker/docker-compose.ci.yml`, waits for health, runs its py
 | Boost endpoint throttles | [`src/boost_weblate/settings_override.py`](src/boost_weblate/settings_override.py) | `BOOST_ENDPOINT_THROTTLE_INFO`, `BOOST_ENDPOINT_THROTTLE_ADD_OR_UPDATE`; merged into `REST_FRAMEWORK` |
 | Weblate version pins | [`pyproject.toml`](pyproject.toml), [`docker/Dockerfile.weblate-plugin`](docker/Dockerfile.weblate-plugin) | PyPI and Docker pins kept in sync; CI [`ci-weblate-pin.yml`](.github/workflows/ci-weblate-pin.yml); scheduled bumps via [`weblate-pin-bump.yml`](.github/workflows/weblate-pin-bump.yml) |
 | Weblate pin scripts | [`scripts/weblate-version-map.sh`](scripts/weblate-version-map.sh), [`scripts/check-weblate-pin-sync.sh`](scripts/check-weblate-pin-sync.sh) | Calver mapping; CI check via [`ci-weblate-pin.yml`](.github/workflows/ci-weblate-pin.yml) |
+| QuickBook grammar | [`docs/quickbook-grammar.md`](docs/quickbook-grammar.md) | Parser-supported constructs, coverage matrix, limitations |
 | API reference | [`docs/boost-endpoint-api.md`](docs/boost-endpoint-api.md) | Full request/response docs for the Boost endpoint |
 | Route registration | [`docs/plugin-http-routes.md`](docs/plugin-http-routes.md) | How and why routes are registered at startup |
 | Docker files | [`docker/README.md`](docker/README.md) | Dockerfile and Compose usage for CI and CD |
