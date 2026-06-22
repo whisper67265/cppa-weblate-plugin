@@ -18,6 +18,7 @@ GitHub Actions and CI/CD helpers for this repository (see [`.github/`](../.githu
 | [`workflows/release.yml`](workflows/release.yml) | **Release** — manual `workflow_dispatch` only; tags `main` from `pyproject.toml` (`v<version>`) and creates a GitHub Release with Weblate compatibility metadata |
 | [`workflows/ci-lint.yml`](workflows/ci-lint.yml) | Lint and format (prek) |
 | [`workflows/ci-test.yml`](workflows/ci-test.yml) | Unit tests and coverage |
+| [`workflows/ci-benchmark.yml`](workflows/ci-benchmark.yml) | QuickBook parser benchmarks (`pytest-benchmark`; JSON artifact; regression gate vs `.benchmarks/`) |
 | [`workflows/ci-package.yml`](workflows/ci-package.yml) | Build and package checks |
 | [`workflows/ci-dependencies.yml`](workflows/ci-dependencies.yml) | Dependency and license audit |
 | [`workflows/ci-weblate-pin.yml`](workflows/ci-weblate-pin.yml) | **Weblate version sync** — callable from CI; runs [`scripts/check-weblate-pin-sync.sh`](../scripts/check-weblate-pin-sync.sh) so `pyproject.toml` and `Dockerfile.weblate-plugin` pins match |
@@ -56,6 +57,28 @@ GH_TEST_REPO_TOKEN=<classic PAT with repo> bash scripts/plugin-functional.sh
 ```
 
 Skip slow plugin tests during local iteration: add `-m "not slow"` to the pytest invocation in the script, or set `PYTEST_PLUGIN_OPTS` accordingly.
+
+## QuickBook parser benchmarks
+
+[`ci-benchmark.yml`](workflows/ci-benchmark.yml) runs `pytest-benchmark` against synthetic `.qbk` documents (100 KB, 500 KB, 1 MB) in [`tests/utils/test_quickbook.py`](../tests/utils/test_quickbook.py). Results are written to `benchmark-results.json` and uploaded as a workflow artifact. By default the job compares against the committed baseline at [`.benchmarks/Linux-CPython-3.14-64bit/0001_baseline.json`](../.benchmarks/Linux-CPython-3.14-64bit/0001_baseline.json) and fails when mean time regresses beyond the configured threshold.
+
+| Variable | Where | Purpose |
+|----------|-------|---------|
+| `BENCHMARK_COMPARE_FAIL` | Repository variable / workflow env (default `mean:30%`) | Passed to `pytest --benchmark-compare-fail` |
+| `BENCHMARK_COMPARE_ENABLED` | Repository variable / workflow env (default `true`) | Set to `false` to skip comparison (record-only mode) |
+
+**Refresh baseline** after an intentional parser performance change. Capture on **`ubuntu-latest` (GitHub Actions)** — the committed baseline must match CI hardware (local VMs/desktops are often ~2× faster and will cause false regressions). Download the `benchmark-*` artifact from a green run, or on a GitHub-hosted runner:
+
+```bash
+uv run --group dev pytest -m benchmark --benchmark-only \
+  -k "not peak_memory" \
+  --benchmark-save=baseline tests/utils/test_quickbook.py
+git add .benchmarks/Linux-CPython-3.14-64bit/0001_baseline.json
+```
+
+Peak-memory bounds are checked separately (`test_parse_1mb_peak_memory`); they are not part of the timing baseline compare.
+
+If CI Python version changes, the `.benchmarks/Linux-CPython-*` directory name changes — regenerate and commit the new baseline path (update `.gitignore` exceptions if needed).
 
 ## Other paths
 

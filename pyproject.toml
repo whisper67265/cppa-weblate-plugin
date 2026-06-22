@@ -9,6 +9,8 @@ requires = ["uv_build>=0.11.19,<0.12.0"]
 [dependency-groups]
 dev = [
   "coverage[toml]==7.14.1",
+  "hypothesis==6.155.3",
+  "pytest-benchmark==5.2.3",
   "pytest-cov==7.1.0"
 ]
 lint = [
@@ -20,6 +22,7 @@ plugin = [
   "pytest-timeout==2.4.0"
 ]
 pre-commit = [
+  "hypothesis==6.155.3",
   "prek==0.4.4",
   "pytest==9.0.3"
 ]
@@ -68,6 +71,7 @@ version = "1.0.0"
 [project.optional-dependencies]
 dev = [
   "coverage[toml]==7.14.1",
+  "hypothesis==6.155.3",
   "prek==0.4.4",
   "pytest-cov==7.1.0",
   "pytest==9.0.3"
@@ -82,7 +86,8 @@ Repository = "https://github.com/cppalliance/cppa-weblate-plugin"
 ignore = [
   "*.yaml",
   "*.yml",
-  ".editorconfig"
+  ".editorconfig",
+  ".benchmarks/**"
 ]
 
 [tool.coverage]
@@ -132,15 +137,21 @@ level = "cautious"
 unauthorized_licenses = []
 
 [tool.pytest.ini_options]
-addopts = ["-m", "not plugin"]
+addopts = ["-m", "not plugin and not benchmark and not fuzz"]
 markers = [
+  "benchmark: parser performance benchmarks (slow; excluded from default test runs)",
   "plugin: requires live Weblate stack (Docker Compose) and optional WEBLATE_API_TOKEN",
-  "slow: long-running plugin integration test"
+  "slow: long-running plugin integration test",
+  "fuzz: property-based / fuzz tests (excluded from default test runs; pytest -m fuzz)"
 ]
 python_classes = ["Test*"]
 python_files = ["test_*.py", "*_test.py"]
 pythonpath = ["src", "."]
 testpaths = ["tests"]
+
+[tool.pytest-benchmark]
+min_rounds = 5
+warmup = true
 
 [tool.ruff]
 line-length = 88

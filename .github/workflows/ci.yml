@@ -19,6 +19,9 @@ jobs:
     uses: ./.github/workflows/ci-lint.yml
   test:
     uses: ./.github/workflows/ci-test.yml
+  benchmark:
+    needs: [test]
+    uses: ./.github/workflows/ci-benchmark.yml
   package:
     uses: ./.github/workflows/ci-package.yml
   dependencies:

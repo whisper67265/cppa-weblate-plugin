@@ -1,0 +1,100 @@
+# SPDX-FileCopyrightText: 2026 Andrew Zhang <whisper67265@outlook.com>
+#
+# SPDX-License-Identifier: BSL-1.0
+
+name: QuickBook parser benchmarks
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  quickbook-benchmarks:
+    name: QuickBook parser benchmarks
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      BENCHMARK_COMPARE_ENABLED: ${{ vars.BENCHMARK_COMPARE_ENABLED || 'true' }}
+      BENCHMARK_COMPARE_FAIL: ${{ vars.BENCHMARK_COMPARE_FAIL || 'mean:30%' }}
+    steps:
+    # actions/checkout v6.0.2
+    - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+      with:
+        persist-credentials: false
+    # actions/setup-python v6.2.0
+    - name: Setup Python
+      uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
+      with:
+        python-version: '3.14'
+    # astral-sh/setup-uv v8.1.0
+    - uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39
+      with:
+        version: 0.11.12
+    - name: Install apt dependencies (Weblate venv)
+      run: sudo ./.github/ci/apt-install
+    - name: Install dependencies (incl. dev)
+      run: uv sync --frozen --group dev
+    - name: Run QuickBook parser benchmarks
+      run: |
+        set -euo pipefail
+        compare_args=()
+        if [ "${BENCHMARK_COMPARE_ENABLED}" != "false" ]; then
+          compare_args+=(--benchmark-compare=0001)
+          compare_args+=(--benchmark-compare-fail="${BENCHMARK_COMPARE_FAIL}")
+        fi
+        uv run --group dev pytest -m benchmark --benchmark-only -v \
+          --benchmark-json=benchmark-results.json \
+          -k "not peak_memory" \
+          "${compare_args[@]}" \
+          tests/utils/test_quickbook.py
+        uv run --group dev pytest -m benchmark -v \
+          -k "peak_memory" \
+          tests/utils/test_quickbook.py 2>&1 | tee peak-memory.log
+    - name: Benchmark summary
+      if: always()
+      run: |
+        uv run --group dev python - <<'PY'
+        import json
+        from pathlib import Path
+
+        path = Path("benchmark-results.json")
+        if not path.is_file():
+            print("benchmark-results.json not found; skipping summary")
+            raise SystemExit(0)
+
+        data = json.loads(path.read_text(encoding="utf-8"))
+        print("## QuickBook parser benchmark summary")
+        print()
+        print("| Benchmark | Mean (s) | Min (s) | Max (s) |")
+        print("|-----------|----------|---------|---------|")
+        for bench in data.get("benchmarks", []):
+            name = bench.get("name", "?")
+            stats = bench.get("stats", {})
+            mean_s = stats.get("mean", 0.0)
+            min_s = stats.get("min", 0.0)
+            max_s = stats.get("max", 0.0)
+            extra = bench.get("extra_info", {})
+            if extra.get("peak_mib") is not None:
+                print(
+                    f"| {name} (peak memory) | {extra['peak_mib']} MiB | — | — |"
+                )
+                continue
+            print(
+                f"| {name} | {mean_s:.4f} | {min_s:.4f} | {max_s:.4f} |"
+            )
+        peak_log = Path("peak-memory.log")
+        if peak_log.is_file():
+            print()
+            print("Peak memory test log:")
+            print(peak_log.read_text(encoding="utf-8"))
+        PY
+    # actions/upload-artifact v4.6.2
+    - name: Upload benchmark results
+      if: always()
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+      with:
+        name: benchmark-${{ github.event.pull_request.number || github.run_id }}
+        path: benchmark-results.json
+        if-no-files-found: warn

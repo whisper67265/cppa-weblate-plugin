@@ -33,8 +33,11 @@ jobs:
     - name: Install dependencies (incl. dev)
       run: uv sync --frozen --group dev --group pre-commit
     - name: Pytest with coverage
+      env:
+        HYPOTHESIS_PROFILE: ci
       run: >
         uv run --group dev --group pre-commit pytest -v --tb=short
+        -m "not plugin and not benchmark"
         --cov=boost_weblate
         --cov-report=term-missing
         --cov-report=xml:coverage.xml

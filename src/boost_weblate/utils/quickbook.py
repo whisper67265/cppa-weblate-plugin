@@ -31,8 +31,9 @@ Inline elements that wrap onto their own line (e.g. a bare [@url ...] line
 inside a paragraph) are treated as part of the surrounding paragraph.
 
 Sections whose body contains further translatable blocks are parsed
-recursively (depth-limited) so nested paragraphs and headings are also
-extracted.
+recursively (depth-limited to 10) so nested paragraphs and headings are also
+extracted. Beyond that depth, nested translatable content is silently skipped
+rather than raising an error.
 
 Reconstruction:
     :func:`_apply_translations` replaces each translatable span in the
@@ -172,7 +173,7 @@ def _find_bracket_end(text: str, start: int) -> int:
             i += 3
             continue
         if text[i] == "\\":
-            i += 2
+            i += min(2, n - i)
             continue
         if text[i] == "[":
             depth += 1
