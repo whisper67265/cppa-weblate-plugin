@@ -46,7 +46,7 @@ classifiers = [
 ]
 dependencies = [
   "packaging==26.2",
-  "Weblate[all]==2026.5"
+  "Weblate[all]==2026.6.1"
 ]
 description = "Standalone Weblate plugin for Boost documentation translation."
 keywords = [
