@@ -122,3 +122,13 @@ Weblate is **not** bumped by Dependabot. A single logical release is pinned in t
 | [`docker/Dockerfile.weblate-plugin`](../docker/Dockerfile.weblate-plugin) | `FROM weblate/weblate:2026.5.0.0` | Docker fixed tag `YEAR.MONTH.PATCH.BUILD` |
 
 Mapping lives in [`scripts/weblate-version-map.sh`](../scripts/weblate-version-map.sh). CI runs [`scripts/check-weblate-pin-sync.sh`](../scripts/check-weblate-pin-sync.sh) on every PR. [`weblate-pin-bump.yml`](workflows/weblate-pin-bump.yml) opens a PR weekly (Monday 09:00 UTC) when a newer PyPI release has a matching Docker fixed tag.
+
+### Bump PR branch reconciliation
+
+When the bump step changes pins, the **Open pull request** job uses branch `weblate-pin/<pypi-version>` and compares `pyproject.toml`, `docker/Dockerfile.weblate-plugin`, and `uv.lock` against the remote:
+
+| Outcome | Condition | Action |
+|---------|-----------|--------|
+| Open PR exists | An open PR already targets the bump branch | No-op (exit) |
+| Remote branch matches bump files | Remote branch exists and those three files match the local bump | Open PR only (no commit or push) |
+| Remote branch stale | Remote branch missing or bump files differ | Commit bump, push (force-with-lease if remote exists), then open PR |

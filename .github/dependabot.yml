@@ -25,6 +25,8 @@ updates:
   # pinned by Weblate and updated via weblate-pin-bump, not independently.
   allow:
   - dependency-type: direct
+  ignore:
+  - dependency-name: Weblate*
   groups:
     uv-patch-minor:
       update-types:

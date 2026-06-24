@@ -16,6 +16,7 @@ on:
 
 permissions:
   contents: write
+  issues: write
   pull-requests: write
 
 jobs:
@@ -53,22 +54,22 @@ jobs:
         target_pypi="${TARGET_PYPI}"
         target_docker="${TARGET_DOCKER}"
         branch="weblate-pin/${target_pypi}"
+        bump_files=(pyproject.toml docker/Dockerfile.weblate-plugin uv.lock)
 
-        existing="$(gh pr list --head "${branch}" --state open --json number --jq 'length')"
-        if [[ "$existing" != "0" ]]; then
+        git fetch origin
+
+        head_ref="${GITHUB_REPOSITORY_OWNER}:${branch}"
+        open_count="$(gh pr list --head "${head_ref}" --state open --json number --jq 'length')"
+        if [[ "$open_count" != "0" ]]; then
           echo "Open PR already exists for branch ${branch}"
           exit 0
         fi
 
-        git config user.name "github-actions[bot]"
-        git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-        git checkout -b "${branch}"
-        git add pyproject.toml docker/Dockerfile.weblate-plugin uv.lock
-        git commit \
-          -m "chore(deps): bump Weblate pin to ${target_pypi}" \
-          -m "PyPI Weblate[all]==${target_pypi}" \
-          -m "Docker weblate/weblate:${target_docker}"
-        git push -u origin "${branch}"
+        remote_exists=false
+        if git ls-remote --exit-code --heads origin "${branch}" | grep -q .; then
+          remote_exists=true
+        fi
+
         pr_body="$(printf '%s\n' \
           '## Summary' \
           '' \
@@ -86,9 +87,66 @@ jobs:
           '' \
           '- [ ] CI passes (including Weblate pin sync check)' \
           '- [ ] Plugin smoke / functional tests against new Weblate stack')"
-        gh pr create \
-          --title "chore(deps): bump Weblate pin to ${target_pypi}" \
-          --base develop \
-          --label dependencies \
-          --label weblate \
-          --body "${pr_body}"
+
+        ensure_labels() {
+          gh label create dependencies --color "0366d6" --description "Dependency updates" 2>/dev/null || true
+          gh label create weblate --color "1d76db" --description "Weblate version pinning" 2>/dev/null || true
+        }
+
+        create_pr() {
+          ensure_labels
+          gh pr create \
+            --title "chore(deps): bump Weblate pin to ${target_pypi}" \
+            --base develop \
+            --head "${branch}" \
+            --label dependencies \
+            --label weblate \
+            --body "${pr_body}"
+        }
+
+        git config user.name "github-actions[bot]"
+        git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+        bump_files_match_remote=false
+        if [[ "$remote_exists" == true ]]; then
+          git fetch origin "refs/heads/${branch}:refs/remotes/origin/${branch}" 2>/dev/null \
+            || git fetch origin "${branch}" || true
+          if git show-ref --verify --quiet "refs/remotes/origin/${branch}"; then
+            if git diff --quiet "origin/${branch}" -- "${bump_files[@]}"; then
+              bump_files_match_remote=true
+              echo "Remote branch ${branch} already matches bump files"
+            else
+              echo "Remote branch ${branch} differs from bump files; reconciling"
+            fi
+          fi
+        fi
+
+        if [[ "$bump_files_match_remote" != true ]]; then
+          git checkout -B "${branch}"
+          git add "${bump_files[@]}"
+          if ! git diff --cached --quiet; then
+            git commit \
+              -m "chore(deps): bump Weblate pin to ${target_pypi}" \
+              -m "PyPI Weblate[all]==${target_pypi}" \
+              -m "Docker weblate/weblate:${target_docker}"
+          fi
+
+          if [[ "$remote_exists" == true ]]; then
+            git push --force-with-lease=refs/heads/"${branch}":refs/remotes/origin/"${branch}" origin "${branch}"
+          elif ! git push -u origin "${branch}"; then
+            echo "Push failed; checking whether remote branch can be reconciled"
+            git fetch origin "refs/heads/${branch}:refs/remotes/origin/${branch}" 2>/dev/null \
+              || git fetch origin "${branch}" || true
+            if git show-ref --verify --quiet "refs/remotes/origin/${branch}"; then
+              if git diff --quiet "origin/${branch}" -- "${bump_files[@]}"; then
+                echo "Remote branch ${branch} already matches bump files after push failure"
+              else
+                git push --force-with-lease=refs/heads/"${branch}":refs/remotes/origin/"${branch}" origin "${branch}"
+              fi
+            else
+              exit 1
+            fi
+          fi
+        fi
+
+        create_pr
