@@ -57,16 +57,16 @@ def test_weblate_contract_weblate_formats_non_empty() -> None:
     except RuntimeError as exc:
         msg = f"{_CONTRACT_PREFIX_WEBLATE_FORMATS} {exc}"
         raise AssertionError(msg) from exc
-    if not formats:
-        msg = (
-            f"{_CONTRACT_PREFIX_WEBLATE_FORMATS} "
-            "weblate_formats_with_plugin_formats() returned an empty tuple"
-        )
-        raise AssertionError(msg)
     if not isinstance(formats, tuple):
         msg = (
             f"{_CONTRACT_PREFIX_WEBLATE_FORMATS} "
             f"expected tuple, got {type(formats).__name__}"
+        )
+        raise AssertionError(msg)
+    if not formats:
+        msg = (
+            f"{_CONTRACT_PREFIX_WEBLATE_FORMATS} "
+            "weblate_formats_with_plugin_formats() returned an empty tuple"
         )
         raise AssertionError(msg)
 

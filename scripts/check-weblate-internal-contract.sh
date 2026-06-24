@@ -56,7 +56,9 @@ def is_modern_calver(name: str) -> bool:
     year = int(name.split(".", 1)[0])
     return year >= 2020
 
-with urllib.request.urlopen("https://pypi.org/pypi/Weblate/json") as resp:
+with urllib.request.urlopen(
+    "https://pypi.org/pypi/Weblate/json", timeout=30
+) as resp:
     data = json.load(resp)
 
 releases = [v for v in data["releases"] if is_modern_calver(v)]

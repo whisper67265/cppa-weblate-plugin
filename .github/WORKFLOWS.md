@@ -118,7 +118,7 @@ Weblate is **not** bumped by Dependabot. A single logical release is pinned in t
 
 | Location | Example | Format |
 |----------|---------|--------|
-| [`pyproject.toml`](../pyproject.toml) | `Weblate[all]==2026.5` | PyPI calver |
+| [`pyproject.toml`](../pyproject.toml) | `Weblate[postgres]==2026.5` | PyPI calver |
 | [`docker/Dockerfile.weblate-plugin`](../docker/Dockerfile.weblate-plugin) | `FROM weblate/weblate:2026.5.0.0` | Docker fixed tag `YEAR.MONTH.PATCH.BUILD` |
 
 Mapping lives in [`scripts/weblate-version-map.sh`](../scripts/weblate-version-map.sh). CI runs [`scripts/check-weblate-pin-sync.sh`](../scripts/check-weblate-pin-sync.sh) on every PR. [`weblate-pin-bump.yml`](workflows/weblate-pin-bump.yml) opens a PR weekly (Monday 09:00 UTC) when a newer PyPI release has a matching Docker fixed tag.
