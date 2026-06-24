@@ -137,12 +137,13 @@ level = "cautious"
 unauthorized_licenses = []
 
 [tool.pytest.ini_options]
-addopts = ["-m", "not plugin and not benchmark and not fuzz"]
+addopts = ["-m", "not plugin and not benchmark and not fuzz and not weblate_contract"]
 markers = [
   "benchmark: parser performance benchmarks (slow; excluded from default test runs)",
   "plugin: requires live Weblate stack (Docker Compose) and optional WEBLATE_API_TOKEN",
   "slow: long-running plugin integration test",
-  "fuzz: property-based / fuzz tests (excluded from default test runs; pytest -m fuzz)"
+  "fuzz: property-based / fuzz tests (excluded from default test runs; pytest -m fuzz)",
+  "weblate_contract: verifies undocumented Weblate internal APIs (pin-bump gate only)"
 ]
 python_classes = ["Test*"]
 python_files = ["test_*.py", "*_test.py"]

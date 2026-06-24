@@ -22,7 +22,7 @@ GitHub Actions and CI/CD helpers for this repository (see [`.github/`](../.githu
 | [`workflows/ci-package.yml`](workflows/ci-package.yml) | Build and package checks |
 | [`workflows/ci-dependencies.yml`](workflows/ci-dependencies.yml) | Dependency and license audit |
 | [`workflows/ci-weblate-pin.yml`](workflows/ci-weblate-pin.yml) | **Weblate version sync** — callable from CI; runs [`scripts/check-weblate-pin-sync.sh`](../scripts/check-weblate-pin-sync.sh) so `pyproject.toml` and `Dockerfile.weblate-plugin` pins match |
-| [`workflows/weblate-pin-bump.yml`](workflows/weblate-pin-bump.yml) | Scheduled Weblate pin bump (PyPI + Docker + `uv.lock`) |
+| [`workflows/weblate-pin-bump.yml`](workflows/weblate-pin-bump.yml) | Scheduled Weblate pin bump (PyPI + Docker + `uv.lock`); runs **upstream contract check** ([`scripts/check-weblate-internal-contract.sh`](../scripts/check-weblate-internal-contract.sh) `--latest`) before bump/PR |
 | [`workflows/ci-plugin-smoke.yml`](workflows/ci-plugin-smoke.yml) | Plugin smoke (Docker stack) |
 | [`workflows/ci-plugin-functional.yml`](workflows/ci-plugin-functional.yml) | Plugin functional tests |
 | [`workflows/ci-plugin-auth.yml`](workflows/ci-plugin-auth.yml) | Plugin auth tests |
