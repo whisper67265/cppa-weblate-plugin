@@ -149,7 +149,7 @@ jobs:
           if ! git diff --cached --quiet; then
             git commit \
               -m "chore(deps): bump Weblate pin to ${target_pypi}" \
-              -m "PyPI Weblate[all]==${target_pypi}" \
+              -m "PyPI Weblate[postgres]==${target_pypi}" \
               -m "Docker weblate/weblate:${target_docker}"
           fi
 

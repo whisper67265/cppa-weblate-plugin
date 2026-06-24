@@ -13,7 +13,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [1.0.0] - 2026-06-11
+### Changed
+
+- **Dependencies** — Replaced `Weblate[all]` with `Weblate[postgres]` in `pyproject.toml` (postgres extra required to import `weblate.urls`); removed redundant direct `packaging` pin (still provided by Weblate). Docker deployments are unaffected (full base image unchanged); local/CI installs use a smaller dependency tree.
+
 
 ### Added
 

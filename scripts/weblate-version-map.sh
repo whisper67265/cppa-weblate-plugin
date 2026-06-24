@@ -17,9 +17,9 @@ pypi_to_docker_fixed() {
 
 parse_pypi_weblate_version() {
   local file="${1:-pyproject.toml}"
-  grep -E '^[[:space:]]*"Weblate\[all\]==[0-9][0-9.]+"' "$file" \
+  grep -E '^[[:space:]]*"Weblate(\[[^]]+\])?==[0-9][0-9.]+"' "$file" \
     | head -n1 \
-    | sed -E 's/.*Weblate\[all\]==([0-9][0-9.]+).*/\1/'
+    | sed -E 's/.*Weblate(\[[^]]+\])?==([0-9][0-9.]+).*/\2/'
 }
 
 parse_docker_weblate_tag() {

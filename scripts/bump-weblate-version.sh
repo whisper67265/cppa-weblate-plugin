@@ -175,7 +175,7 @@ if [[ "$DRY_RUN" -eq 1 ]]; then
   exit 0
 fi
 
-sed -i "s/Weblate\\[all\\]==[0-9][0-9.]*/Weblate[all]==${target_pypi}/" "$PYPI_FILE"
+sed -i "s/Weblate\\(\\[[^]]*\\]\\)\\?==[0-9][0-9.]*/Weblate[postgres]==${target_pypi}/" "$PYPI_FILE"
 sed -i "s|^FROM weblate/weblate:[0-9][0-9.]*|FROM weblate/weblate:${target_docker}|" "$DOCKER_FILE"
 
 (

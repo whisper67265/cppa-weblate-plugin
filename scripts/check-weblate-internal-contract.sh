@@ -18,7 +18,7 @@ usage() {
 Usage: check-weblate-internal-contract.sh [--latest]
 
   (default)  Run contract tests against the already-installed Weblate version.
-  --latest   Install the newest modern calver Weblate[all] from PyPI, then run tests.
+  --latest   Install the newest modern calver Weblate from PyPI, then run tests.
 EOF
 }
 
@@ -71,8 +71,8 @@ PY
 
 if [[ "$LATEST" -eq 1 ]]; then
   latest_ver="$(resolve_latest_weblate_pypi)"
-  echo "Installing latest PyPI Weblate[all]==${latest_ver}"
-  uv pip install "Weblate[all]==${latest_ver}"
+  echo "Installing latest PyPI Weblate[postgres]==${latest_ver}"
+  uv pip install "Weblate[postgres]==${latest_ver}"
 fi
 
 weblate_version="$(uv run python3 -c 'import importlib.metadata; print(importlib.metadata.version("Weblate"))')"

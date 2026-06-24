@@ -48,8 +48,7 @@ classifiers = [
   "Topic :: Software Development :: Localization"
 ]
 dependencies = [
-  "packaging==26.2",
-  "Weblate[all]==2026.5"
+  "Weblate[postgres]==2026.5"
 ]
 description = "Standalone Weblate plugin for Boost documentation translation."
 keywords = [
