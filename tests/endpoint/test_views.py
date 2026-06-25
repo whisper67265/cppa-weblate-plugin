@@ -284,6 +284,52 @@ def test_boost_add_or_update_task_matches_boost_weblate_loop(
     assert result["ja"]["submodules"] == ["json"]
 
 
+def test_boost_add_or_update_task_declares_celery_time_limits() -> None:
+    from boost_weblate.endpoint import tasks as tasks_mod
+    from boost_weblate.settings_override import (
+        BOOST_TASK_SOFT_TIME_LIMIT,
+        BOOST_TASK_TIME_LIMIT,
+    )
+
+    task = tasks_mod.boost_add_or_update_task
+    assert task.soft_time_limit == BOOST_TASK_SOFT_TIME_LIMIT
+    assert task.time_limit == BOOST_TASK_TIME_LIMIT
+
+
+def test_boost_add_or_update_task_soft_time_limit_raises_task_timeout(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from celery.exceptions import SoftTimeLimitExceeded
+
+    from boost_weblate.endpoint import tasks as tasks_mod
+    from boost_weblate.settings_override import BOOST_TASK_SOFT_TIME_LIMIT
+
+    user = MagicMock()
+    monkeypatch.setattr(tasks_mod.User.objects, "get", lambda pk: user)
+
+    class TimeoutService:
+        def __init__(self, **_kw):  # noqa: ANN003
+            pass
+
+        def process_all(self, _submodules, *, user, request=None):  # noqa: ANN001
+            raise SoftTimeLimitExceeded()
+
+    monkeypatch.setattr(tasks_mod, "BoostComponentService", TimeoutService)
+
+    with pytest.raises(BoostEndpointError) as exc_info:
+        tasks_mod.boost_add_or_update_task.run(
+            organization="o",
+            add_or_update={"en": ["x"]},
+            version="v",
+            extensions=None,
+            user_id=1,
+        )
+
+    assert exc_info.value.code == BoostEndpointErrorCode.TASK_TIMEOUT
+    assert exc_info.value.metadata["soft_time_limit"] == BOOST_TASK_SOFT_TIME_LIMIT
+    assert "time_limit" in exc_info.value.metadata
+
+
 def test_boost_add_or_update_task_propagates_service_errors(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

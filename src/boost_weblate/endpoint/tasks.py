@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from celery.exceptions import SoftTimeLimitExceeded
 from weblate.auth.models import AuthenticatedHttpRequest, User
 from weblate.utils.celery import app
 from weblate.utils.errors import report_error
@@ -18,13 +19,21 @@ from boost_weblate.endpoint.errors import (
     wrap_task_error,
 )
 from boost_weblate.endpoint.services import BoostComponentService
+from boost_weblate.settings_override import (
+    BOOST_TASK_SOFT_TIME_LIMIT,
+    BOOST_TASK_TIME_LIMIT,
+)
 from boost_weblate.utils.task_lock import (
     build_add_or_update_lock_key,
     redis_task_lock,
 )
 
 
-@app.task(trail=False)
+@app.task(
+    trail=False,
+    soft_time_limit=BOOST_TASK_SOFT_TIME_LIMIT,
+    time_limit=BOOST_TASK_TIME_LIMIT,
+)
 @redis_task_lock(key_builder=build_add_or_update_lock_key)
 def boost_add_or_update_task(
     *,
@@ -67,6 +76,15 @@ def boost_add_or_update_task(
         return results
     except BoostEndpointError:
         raise
+    except SoftTimeLimitExceeded as exc:
+        raise BoostEndpointError(
+            "Boost add-or-update task exceeded soft time limit",
+            code=BoostEndpointErrorCode.TASK_TIMEOUT,
+            metadata={
+                "soft_time_limit": BOOST_TASK_SOFT_TIME_LIMIT,
+                "time_limit": BOOST_TASK_TIME_LIMIT,
+            },
+        ) from exc
     except Exception as exc:
         report_error(cause="Boost add-or-update task")
         raise wrap_task_error(exc) from exc
