@@ -290,7 +290,7 @@ Triggered on push and PR to `main` and `develop`. Calls nine reusable sub-workfl
 | `benchmark` | [`.github/workflows/ci-benchmark.yml`](.github/workflows/ci-benchmark.yml) | QuickBook parser benchmarks (`pytest-benchmark`); JSON artifact; optional regression gate vs `.benchmarks/` baseline |
 | `package` | [`.github/workflows/ci-package.yml`](.github/workflows/ci-package.yml) | `uv build`, twine, pydistcheck, pyroma, check-wheel-contents, check-manifest |
 | `dependencies` | [`.github/workflows/ci-dependencies.yml`](.github/workflows/ci-dependencies.yml) | pip-audit, liccheck, dependency review (on PRs) |
-| `weblate-pin` | [`.github/workflows/ci-weblate-pin.yml`](.github/workflows/ci-weblate-pin.yml) | PyPI `Weblate[all]==…` in `pyproject.toml` matches Docker `FROM weblate/weblate:…` (`scripts/check-weblate-pin-sync.sh`) |
+| `weblate-pin` | [`.github/workflows/ci-weblate-pin.yml`](.github/workflows/ci-weblate-pin.yml) | PyPI `Weblate[postgres]==…` in `pyproject.toml` matches Docker `FROM weblate/weblate:…` (`scripts/check-weblate-pin-sync.sh`) |
 | `plugin-smoke` | [`.github/workflows/ci-plugin-smoke.yml`](.github/workflows/ci-plugin-smoke.yml) | Docker stack → P0 smoke tests (`scripts/plugin-smoke.sh`) |
 | `plugin-auth` | [`.github/workflows/ci-plugin-auth.yml`](.github/workflows/ci-plugin-auth.yml) | Docker stack → auth tests (`scripts/plugin-auth.sh`) |
 | `plugin-functional` | [`.github/workflows/ci-plugin-functional.yml`](.github/workflows/ci-plugin-functional.yml) | Docker stack → E2E functional tests (`scripts/plugin-functional.sh`); optional `GH_TEST_REPO_TOKEN` secret for GitHub-backed tests |

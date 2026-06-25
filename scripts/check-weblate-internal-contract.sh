@@ -10,6 +10,8 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
+# shellcheck source=weblate-version-map.sh
+source "${ROOT}/scripts/weblate-version-map.sh"
 
 LATEST=0
 
@@ -40,39 +42,8 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-resolve_latest_weblate_pypi() {
-  uv run --with packaging python3 - <<'PY'
-import json
-import re
-import sys
-import urllib.request
-from packaging.version import Version
-
-calver = re.compile(r"^\d{4}\.\d+(?:\.\d+)?$")
-
-def is_modern_calver(name: str) -> bool:
-    if not calver.match(name):
-        return False
-    year = int(name.split(".", 1)[0])
-    return year >= 2020
-
-with urllib.request.urlopen(
-    "https://pypi.org/pypi/Weblate/json", timeout=30
-) as resp:
-    data = json.load(resp)
-
-releases = [v for v in data["releases"] if is_modern_calver(v)]
-if not releases:
-    print("ERROR: no modern calver Weblate releases found on PyPI", file=sys.stderr)
-    raise SystemExit(1)
-
-releases.sort(key=Version, reverse=True)
-print(releases[0])
-PY
-}
-
 if [[ "$LATEST" -eq 1 ]]; then
-  latest_ver="$(resolve_latest_weblate_pypi)"
+  latest_ver="$(latest_modern_weblate_pypi_release)"
   echo "Installing latest PyPI Weblate[postgres]==${latest_ver}"
   uv pip install "Weblate[postgres]==${latest_ver}"
 fi
