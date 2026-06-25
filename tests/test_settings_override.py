@@ -110,3 +110,36 @@ def test_allowed_clone_hosts_parses_env(monkeypatch: pytest.MonkeyPatch) -> None
 
     monkeypatch.setenv("BOOST_ALLOWED_CLONE_HOSTS", "")
     assert allowed_clone_hosts() == []
+
+
+def test_boost_task_timeout_settings_defaults(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("BOOST_TASK_SOFT_TIME_LIMIT", raising=False)
+    monkeypatch.delenv("BOOST_TASK_TIME_LIMIT", raising=False)
+
+    import boost_weblate.settings_override as so
+
+    importlib.reload(so)
+
+    assert so.BOOST_TASK_SOFT_TIME_LIMIT == 1800
+    assert so.BOOST_TASK_TIME_LIMIT == 2100
+
+
+def test_boost_task_timeout_settings_reads_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    from boost_weblate.settings_override import boost_task_timeout_settings
+
+    monkeypatch.setenv("BOOST_TASK_SOFT_TIME_LIMIT", "900")
+    monkeypatch.setenv("BOOST_TASK_TIME_LIMIT", "1200")
+    settings = boost_task_timeout_settings()
+    assert settings["soft_time_limit"] == 900
+    assert settings["time_limit"] == 1200
+
+
+def test_boost_task_timeout_settings_rejects_invalid_limits(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from boost_weblate.settings_override import boost_task_timeout_settings
+
+    monkeypatch.setenv("BOOST_TASK_SOFT_TIME_LIMIT", "1200")
+    monkeypatch.setenv("BOOST_TASK_TIME_LIMIT", "900")
+    with pytest.raises(ValueError, match="BOOST_TASK_TIME_LIMIT"):
+        boost_task_timeout_settings()

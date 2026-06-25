@@ -16,9 +16,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - **Dependencies** — Replaced `Weblate[all]` with `Weblate[postgres]` in `pyproject.toml` (postgres extra required to import `weblate.urls`); removed redundant direct `packaging` pin (still provided by Weblate). Docker deployments are unaffected (full base image unchanged); local/CI installs use a smaller dependency tree.
-
+- **CI** — Unit test workflow runs on a Python version matrix (**3.12**, **3.13**, **3.14**) matching declared `pyproject.toml` classifiers; coverage artifacts are uploaded per matrix leg.
 
 ### Added
+
+- **Celery task timeouts** — `boost_add_or_update_task` declares configurable soft/hard time limits (`BOOST_TASK_SOFT_TIME_LIMIT`, `BOOST_TASK_TIME_LIMIT`; defaults 1800/2100 s). Exceeding the soft limit raises `BoostEndpointError` with code `task_timeout`.
 
 - **QuickBook format** — `QuickBookFormat` convert pipeline for `.qbk` templates; parsing and reconstruction in `boost_weblate.utils.quickbook`; registration via `WEBLATE_FORMATS` in `settings_override.py`.
 - **Boost endpoint HTTP API** — routes under `/boost-endpoint/`:
@@ -55,7 +57,7 @@ The following are subject to this policy:
 
 - **HTTP API** — request/response schema and auth requirements for `POST /boost-endpoint/add-or-update/`, `GET /boost-endpoint/info/`, and related Boost endpoint routes documented in `docs/boost-endpoint-api.md`.
 - **Format registration** — dotted import paths registered in `WEBLATE_FORMATS` (e.g. `boost_weblate.formats.quickbook.QuickBookFormat`).
-- **Settings hook** — documented environment variables read by `settings_override.py` (e.g. `BOOST_ENDPOINT_THROTTLE_INFO`, `BOOST_ENDPOINT_THROTTLE_ADD_OR_UPDATE`).
+- **Settings hook** — documented environment variables read by `settings_override.py` (e.g. `BOOST_ENDPOINT_THROTTLE_INFO`, `BOOST_ENDPOINT_THROTTLE_ADD_OR_UPDATE`, `BOOST_TASK_SOFT_TIME_LIMIT`, `BOOST_TASK_TIME_LIMIT`).
 
 ### Non-guarantees
 

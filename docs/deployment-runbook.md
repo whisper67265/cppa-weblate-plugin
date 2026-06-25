@@ -87,6 +87,11 @@ Runtime plugin env vars (set in `.env`, read by `settings_override.py` at boot):
 | `BOOST_ENDPOINT_THROTTLE_INFO` | `60/minute` | Scoped rate for `GET /boost-endpoint/info/` |
 | `BOOST_ENDPOINT_THROTTLE_ADD_OR_UPDATE` | `10/hour` | Scoped rate for `POST /boost-endpoint/add-or-update/` |
 | `BOOST_ALLOWED_CLONE_HOSTS` | `github.com` | Comma-separated hostnames permitted for git clone URLs (HTTPS only; SSRF mitigation) |
+| `BOOST_TASK_SOFT_TIME_LIMIT` | `1800` | Celery soft time limit (seconds) for `boost_add_or_update_task`; exceeding it fails the task with `task_timeout` |
+| `BOOST_TASK_TIME_LIMIT` | `2100` | Celery hard time limit (seconds); must be greater than `BOOST_TASK_SOFT_TIME_LIMIT` |
+| `BOOST_TASK_LOCK_TIMEOUT` | `1800` | Redis lock TTL (seconds) for deduplicating concurrent add-or-update requests |
+| `BOOST_TASK_LOCK_ON_CONFLICT` | `skip` | `skip` (reject duplicate immediately) or `wait` (block up to wait timeout) |
+| `BOOST_TASK_LOCK_WAIT_TIMEOUT` | `300` | Max seconds to wait when `BOOST_TASK_LOCK_ON_CONFLICT=wait` |
 
 ### Weblate environment variables
 
@@ -112,6 +117,11 @@ Key variables (full reference in `.env.example`):
 | `BOOST_ENDPOINT_THROTTLE_INFO` | `60/minute` | `.env` | Plugin rate limit (see above) |
 | `BOOST_ENDPOINT_THROTTLE_ADD_OR_UPDATE` | `10/hour` | `.env` | Plugin rate limit (see above) |
 | `BOOST_ALLOWED_CLONE_HOSTS` | `github.com` | `.env` | Hostnames allowed for git clone URLs (see above) |
+| `BOOST_TASK_SOFT_TIME_LIMIT` | `1800` | `.env` | Celery soft time limit for add-or-update tasks (see above) |
+| `BOOST_TASK_TIME_LIMIT` | `2100` | `.env` | Celery hard time limit for add-or-update tasks (see above) |
+| `BOOST_TASK_LOCK_TIMEOUT` | `1800` | `.env` | Redis task-lock TTL for add-or-update deduplication (see above) |
+| `BOOST_TASK_LOCK_ON_CONFLICT` | `skip` | `.env` | Lock conflict policy: `skip` or `wait` (see above) |
+| `BOOST_TASK_LOCK_WAIT_TIMEOUT` | `300` | `.env` | Max wait when lock conflict policy is `wait` (see above) |
 | `WEBLATE_EMAIL_HOST` | `smtp.example.com` | `.env` | SMTP server; set user/password for production |
 | `WEBLATE_GITHUB_USERNAME` | — | `.env` | GitHub account for VCS; required with token for add-or-update |
 | `WEBLATE_GITHUB_TOKEN` | — | `.env` | GitHub PAT (`repo` scope); rotate via pre-deploy checklist |

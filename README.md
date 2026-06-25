@@ -254,7 +254,8 @@ boost_add_or_update_task.delay(
 
 - Registered on Weblate's own Celery app (`weblate.utils.celery.app`), so it runs in the same worker pool as all other Weblate tasks with no extra broker configuration.
 - `user_id` is passed instead of the `User` object because Celery serializes task arguments to JSON; the task re-fetches the user from the database inside the worker.
-- Exceptions propagate unhandled so Celery marks the task as `FAILURE` and monitoring/alerting can act on it.
+- Celery `soft_time_limit` and `time_limit` bound long-running add-or-update work (defaults **1800** s / **2100** s via `BOOST_TASK_SOFT_TIME_LIMIT` / `BOOST_TASK_TIME_LIMIT` in `.env`; see [Environment & Configuration Reference](#environment--configuration-reference)). Exceeding the soft limit raises `BoostEndpointError` with code `task_timeout`.
+- Fatal exceptions propagate so Celery marks the task as `FAILURE` and monitoring/alerting can act on it.
 - `trail=False` suppresses Celery's default task-result trail to avoid unbounded result-backend growth.
 
 **Verifying the worker is running:**
@@ -286,7 +287,7 @@ Triggered on push and PR to `main` and `develop`. Calls nine reusable sub-workfl
 | Job | Workflow | What it checks |
 |-----|----------|----------------|
 | `lint` | [`.github/workflows/ci-lint.yml`](.github/workflows/ci-lint.yml) | prek (Ruff, YAML/TOML, REUSE, actionlint, pytest) |
-| `test` | [`.github/workflows/ci-test.yml`](.github/workflows/ci-test.yml) | pytest + 90% coverage gate (`--cov-fail-under=90`) |
+| `test` | [`.github/workflows/ci-test.yml`](.github/workflows/ci-test.yml) | pytest + 90% coverage gate on Python **3.12**, **3.13**, and **3.14** (`--cov-fail-under=90`) |
 | `benchmark` | [`.github/workflows/ci-benchmark.yml`](.github/workflows/ci-benchmark.yml) | QuickBook parser benchmarks (`pytest-benchmark`); JSON artifact; optional regression gate vs `.benchmarks/` baseline |
 | `package` | [`.github/workflows/ci-package.yml`](.github/workflows/ci-package.yml) | `uv build`, twine, pydistcheck, pyroma, check-wheel-contents, check-manifest |
 | `dependencies` | [`.github/workflows/ci-dependencies.yml`](.github/workflows/ci-dependencies.yml) | pip-audit, liccheck, dependency review (on PRs) |
@@ -347,6 +348,8 @@ Each script builds `docker/docker-compose.ci.yml`, waits for health, runs its py
 | All env vars | [`.env.example`](.env.example) | Annotated template — copy to `.env` on the deploy server |
 | Deployment & promotion | [`docs/deployment-runbook.md`](docs/deployment-runbook.md) | Staging/production CD, `PROMOTE_PAT`, environments, health checks, rollback, release tagging |
 | Boost endpoint throttles | [`src/boost_weblate/settings_override.py`](src/boost_weblate/settings_override.py) | `BOOST_ENDPOINT_THROTTLE_INFO`, `BOOST_ENDPOINT_THROTTLE_ADD_OR_UPDATE`; merged into `REST_FRAMEWORK` |
+| Celery task timeouts | [`.env.example`](.env.example), [`src/boost_weblate/settings_override.py`](src/boost_weblate/settings_override.py) | `BOOST_TASK_SOFT_TIME_LIMIT`, `BOOST_TASK_TIME_LIMIT` for `boost_add_or_update_task`; defaults 1800/2100 s |
+| Celery task lock | [`.env.example`](.env.example), [`src/boost_weblate/settings_override.py`](src/boost_weblate/settings_override.py) | `BOOST_TASK_LOCK_TIMEOUT`, `BOOST_TASK_LOCK_ON_CONFLICT`, `BOOST_TASK_LOCK_WAIT_TIMEOUT` (dedupe concurrent add-or-update) |
 | Weblate version pins | [`pyproject.toml`](pyproject.toml), [`docker/Dockerfile.weblate-plugin`](docker/Dockerfile.weblate-plugin) | PyPI and Docker pins kept in sync; CI [`ci-weblate-pin.yml`](.github/workflows/ci-weblate-pin.yml); scheduled bumps via [`weblate-pin-bump.yml`](.github/workflows/weblate-pin-bump.yml) |
 | Weblate pin scripts | [`scripts/weblate-version-map.sh`](scripts/weblate-version-map.sh), [`scripts/check-weblate-pin-sync.sh`](scripts/check-weblate-pin-sync.sh) | Calver mapping; CI check via [`ci-weblate-pin.yml`](.github/workflows/ci-weblate-pin.yml) |
 | QuickBook grammar | [`docs/quickbook-grammar.md`](docs/quickbook-grammar.md) | Parser-supported constructs, coverage matrix, limitations |
@@ -366,6 +369,8 @@ prek run --all-files --show-diff-on-failure
 ```
 
 - **Tests:** add tests next to the code you touch (`tests/formats/`, `tests/utils/`, or `tests/endpoint/`). Keep `django.setup()`-friendly patterns; heavy DB or migration suites are intentionally avoided in the bundled Django test settings.
+
+- **Python versions:** the package supports CPython **3.12+** (`requires-python` in `pyproject.toml`). CI unit tests run on **3.12**, **3.13**, and **3.14**; lint, package, dependency, and benchmark jobs use a single version (currently **3.14**).
 
 - **Coverage:** the CI test job enforces 90% minimum on `boost_weblate`. Run locally:
 

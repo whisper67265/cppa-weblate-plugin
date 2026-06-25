@@ -316,7 +316,9 @@ The task uses Weblate's own Celery `app` instance (`weblate.utils.celery.app`) a
 
 `user_id` (an integer primary key) is passed rather than the user object itself because Celery serializes task arguments to JSON. The task re-fetches the user with `User.objects.get(pk=user_id)` inside the worker.
 
-Fatal task failures raise `BoostEndpointError` (a `WeblateError` subclass from `weblate.trans.exceptions`) with a stable `code` and `metadata`, causing Celery to mark the task `FAILURE`. Examples: `task_user_not_found` when the `user_id` no longer exists, or `task_internal_error` for unexpected exceptions (after `report_error()`). Per-submodule errors that are recoverable (e.g. clone failure, permission denial for a single submodule) are collected into the submodule `errors` list as structured objects and do not raise exceptions.
+Fatal task failures raise `BoostEndpointError` (a `WeblateError` subclass from `weblate.trans.exceptions`) with a stable `code` and `metadata`, causing Celery to mark the task `FAILURE`. Examples: `task_user_not_found` when the `user_id` no longer exists, `task_timeout` when the task exceeds its Celery soft time limit, or `task_internal_error` for unexpected exceptions (after `report_error()`). Per-submodule errors that are recoverable (e.g. clone failure, permission denial for a single submodule) are collected into the submodule `errors` list as structured objects and do not raise exceptions.
+
+The task declares Celery `soft_time_limit` and `time_limit` from `settings_override.py` (defaults **1800** s / **2100** s, overridable via `BOOST_TASK_SOFT_TIME_LIMIT` and `BOOST_TASK_TIME_LIMIT`). Defaults align with `BOOST_TASK_LOCK_TIMEOUT` so the Redis task lock does not expire while a long-running add-or-update is still active. When the soft limit is exceeded, Celery raises `SoftTimeLimitExceeded`; the task catches it and re-raises `BoostEndpointError` with code `task_timeout` and metadata `soft_time_limit` / `time_limit`.
 
 `trail=False` is set on the task to suppress Celery's default task-result trail and avoid unbounded result-backend growth in long-running deployments.
 
@@ -416,6 +418,7 @@ HTTP `400` responses and submodule `errors` lists use the same object schema. Va
 | `git_push_timeout` | Git commit/push subprocess timeout |
 | `all_components_failed` | Every scanned component failed create/update |
 | `task_user_not_found` | Celery task `user_id` not found |
+| `task_timeout` | Celery soft time limit exceeded (`BOOST_TASK_SOFT_TIME_LIMIT`) |
 | `task_internal_error` | Unexpected exception in the Celery task |
 
 ### Recoverable vs fatal

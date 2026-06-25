@@ -32,6 +32,7 @@ class BoostEndpointErrorCode(StrEnum):
     TASK_USER_NOT_FOUND = "task_user_not_found"
     TASK_INTERNAL_ERROR = "task_internal_error"
     TASK_DUPLICATE = "task_duplicate"
+    TASK_TIMEOUT = "task_timeout"
 
 
 class BoostEndpointError(WeblateError):

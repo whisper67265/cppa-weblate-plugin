@@ -169,6 +169,42 @@ BOOST_TASK_LOCK_TIMEOUT = _task_lock_settings["timeout"]
 BOOST_TASK_LOCK_ON_CONFLICT = _task_lock_settings["on_conflict"]
 BOOST_TASK_LOCK_WAIT_TIMEOUT = _task_lock_settings["wait_timeout"]
 
+# Defaults align with BOOST_TASK_LOCK_TIMEOUT so the Redis lock does not expire
+# while a long-running add-or-update task is still active.
+_DEFAULT_BOOST_TASK_SOFT_TIME_LIMIT = 1800
+_DEFAULT_BOOST_TASK_TIME_LIMIT = 2100
+
+
+def boost_task_timeout_settings() -> dict[str, int]:
+    """Celery soft/hard time limits for add-or-update tasks (env overrides optional)."""
+    soft_time_limit = int(
+        os.environ.get(
+            "BOOST_TASK_SOFT_TIME_LIMIT",
+            str(_DEFAULT_BOOST_TASK_SOFT_TIME_LIMIT),
+        )
+    )
+    time_limit = int(
+        os.environ.get(
+            "BOOST_TASK_TIME_LIMIT",
+            str(_DEFAULT_BOOST_TASK_TIME_LIMIT),
+        )
+    )
+    if time_limit <= soft_time_limit:
+        msg = (
+            "BOOST_TASK_TIME_LIMIT must be greater than BOOST_TASK_SOFT_TIME_LIMIT "
+            f"({time_limit} <= {soft_time_limit})"
+        )
+        raise ValueError(msg)
+    return {
+        "soft_time_limit": soft_time_limit,
+        "time_limit": time_limit,
+    }
+
+
+_task_timeout_settings = boost_task_timeout_settings()
+BOOST_TASK_SOFT_TIME_LIMIT = _task_timeout_settings["soft_time_limit"]
+BOOST_TASK_TIME_LIMIT = _task_timeout_settings["time_limit"]
+
 
 def merge_boost_endpoint_throttle_rates(
     rest_framework: dict[str, Any],

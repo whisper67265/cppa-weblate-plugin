@@ -12,8 +12,12 @@ permissions:
 
 jobs:
   test-and-coverage:
-    name: Test and coverage
+    name: Test and coverage (Python ${{ matrix.python-version }})
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ['3.12', '3.13', '3.14']
     steps:
     # actions/checkout v6.0.2
     - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
@@ -23,7 +27,7 @@ jobs:
     - name: Setup Python
       uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
       with:
-        python-version: '3.14'
+        python-version: ${{ matrix.python-version }}
     # astral-sh/setup-uv v8.1.0
     - uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39
       with:
@@ -49,7 +53,7 @@ jobs:
     - name: Upload coverage artifacts
       uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
       with:
-        name: coverage-${{ github.event.pull_request.number || github.run_id }}
+        name: coverage-py${{ matrix.python-version }}-${{ github.event.pull_request.number || github.run_id }}
         path: |
           coverage.xml
           htmlcov/
