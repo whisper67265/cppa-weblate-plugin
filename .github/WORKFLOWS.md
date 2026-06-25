@@ -17,7 +17,7 @@ GitHub Actions and CI/CD helpers for this repository (see [`.github/`](../.githu
 | [`workflows/promote-main.yml`](workflows/promote-main.yml) | **Promote to production** — manual `workflow_dispatch`; ff-only `develop` → `main` via `PROMOTE_PAT` so CI and `cd.yml` run on `main` |
 | [`workflows/release.yml`](workflows/release.yml) | **Release** — manual `workflow_dispatch` only; tags `main` from `pyproject.toml` (`v<version>`) and creates a GitHub Release with Weblate compatibility metadata |
 | [`workflows/ci-lint.yml`](workflows/ci-lint.yml) | Lint and format (prek) |
-| [`workflows/ci-test.yml`](workflows/ci-test.yml) | Unit tests and coverage |
+| [`workflows/ci-test.yml`](workflows/ci-test.yml) | Unit tests and coverage (Python **3.12**, **3.13**, **3.14** matrix; `fail-fast: false`) |
 | [`workflows/ci-benchmark.yml`](workflows/ci-benchmark.yml) | QuickBook parser benchmarks (`pytest-benchmark`; JSON artifact; regression gate vs `.benchmarks/`) |
 | [`workflows/ci-package.yml`](workflows/ci-package.yml) | Build and package checks |
 | [`workflows/ci-dependencies.yml`](workflows/ci-dependencies.yml) | Dependency and license audit |
@@ -28,6 +28,12 @@ GitHub Actions and CI/CD helpers for this repository (see [`.github/`](../.githu
 | [`workflows/ci-plugin-auth.yml`](workflows/ci-plugin-auth.yml) | Plugin auth tests |
 
 Callable workflows (`ci-*`, `ci-plugin-*`) are triggered only via `workflow_call` from `ci.yml`, not directly on push.
+
+## Unit test Python matrix
+
+[`ci-test.yml`](workflows/ci-test.yml) runs pytest and the 90% coverage gate on **`ubuntu-latest`** for each supported CPython release declared in [`pyproject.toml`](../pyproject.toml) classifiers: **3.12**, **3.13**, and **3.14**. `fail-fast: false` keeps other matrix legs running when one version fails. Coverage artifacts are uploaded per matrix leg as `coverage-py<version>-<pr-or-run-id>`.
+
+Lint ([`ci-lint.yml`](workflows/ci-lint.yml)), package ([`ci-package.yml`](workflows/ci-package.yml)), dependencies ([`ci-dependencies.yml`](workflows/ci-dependencies.yml)), and QuickBook benchmarks ([`ci-benchmark.yml`](workflows/ci-benchmark.yml)) still run on a single Python version (currently **3.14**). Plugin Docker jobs ([`ci-plugin-*`](workflows/ci-plugin-smoke.yml)) use **3.12** inside the Weblate image build context.
 
 ## Plugin integration jobs
 
