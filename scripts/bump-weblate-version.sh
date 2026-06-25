@@ -61,29 +61,19 @@ if [[ -z "$current" ]]; then
 fi
 
 list_weblate_pypi_candidates() {
+  local releases list_status=0
+  releases="$(list_modern_weblate_pypi_releases)" || list_status=$?
+  if [[ $list_status -ne 0 ]]; then
+    return 1
+  fi
+
   uv run --with packaging python3 - "$current" "$FORCE_VERSION" <<'PY'
-import json
-import re
 import sys
-import urllib.request
 from packaging.version import Version
 
 current = Version(sys.argv[1])
 force = sys.argv[2]
-
-calver = re.compile(r"^\d{4}\.\d+(?:\.\d+)?$")
-
-def is_modern_calver(name: str) -> bool:
-    if not calver.match(name):
-        return False
-    year = int(name.split(".", 1)[0])
-    return year >= 2020
-
-with urllib.request.urlopen("https://pypi.org/pypi/Weblate/json") as resp:
-    data = json.load(resp)
-
-releases = [v for v in data["releases"] if is_modern_calver(v)]
-releases.sort(key=Version, reverse=True)
+releases = [line.strip() for line in sys.stdin if line.strip()]
 
 if force:
     if force not in releases:
@@ -99,6 +89,7 @@ if not candidates:
 for candidate in candidates:
     print(candidate)
 PY
+<<<"$releases"
 }
 
 resolve_target() {
@@ -175,7 +166,7 @@ if [[ "$DRY_RUN" -eq 1 ]]; then
   exit 0
 fi
 
-sed -i "s/Weblate\\[all\\]==[0-9][0-9.]*/Weblate[all]==${target_pypi}/" "$PYPI_FILE"
+sed -i "s/Weblate\\(\\[[^]]*\\]\\)\\?==[0-9][0-9.]*/Weblate[postgres]==${target_pypi}/" "$PYPI_FILE"
 sed -i "s|^FROM weblate/weblate:[0-9][0-9.]*|FROM weblate/weblate:${target_docker}|" "$DOCKER_FILE"
 
 (

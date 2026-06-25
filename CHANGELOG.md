@@ -13,7 +13,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [1.0.0] - 2026-06-11
+### Changed
+
+- **Dependencies** — Replaced `Weblate[all]` with `Weblate[postgres]` in `pyproject.toml` (postgres extra required to import `weblate.urls`); removed redundant direct `packaging` pin (still provided by Weblate). Docker deployments are unaffected (full base image unchanged); local/CI installs use a smaller dependency tree.
+
 
 ### Added
 
@@ -26,7 +29,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Rate limiting** — scoped DRF throttles for protected endpoints (`info`: 60/minute; `add-or-update`: 10/hour); `BOOST_ENDPOINT_THROTTLE_INFO` and `BOOST_ENDPOINT_THROTTLE_ADD_OR_UPDATE` env overrides; HTTP 429 with `Retry-After`.
 - **CI pipeline** — umbrella `ci.yml` with lint, test (90% coverage gate), package, dependency audit, Weblate pin sync, and Docker-based plugin smoke/auth/functional jobs.
 - **CD pipeline** — staging auto-deploy on `develop` (`cd.yml`); production via `promote-main.yml` (ff-only `develop` → `main`) followed by `main` CD.
-- **Weblate version pinning** — `Weblate[all]==…` in `pyproject.toml` synced with Docker `FROM weblate/weblate:…`; enforced by `ci-weblate-pin.yml`; scheduled bumps via `weblate-pin-bump.yml`.
+- **Weblate version pinning** — `Weblate[postgres]==…` in `pyproject.toml` synced with Docker `FROM weblate/weblate:…`; enforced by `ci-weblate-pin.yml`; scheduled bumps via `weblate-pin-bump.yml`.
 - **Release workflow** — manual `release.yml` tags `main` from `pyproject.toml` version and creates GitHub Releases.
 
 ## Deprecation Policy

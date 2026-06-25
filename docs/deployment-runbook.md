@@ -171,7 +171,7 @@ The Dockerfile builds an overlay image on a **pinned** `weblate/weblate` tag ali
 
 | File | Example |
 |------|---------|
-| `pyproject.toml` | `Weblate[all]==2026.5` |
+| `pyproject.toml` | `Weblate[postgres]==2026.5` |
 | `docker/Dockerfile.weblate-plugin` | `FROM weblate/weblate:2026.5.0.0` |
 
 PyPI uses calver (`2026.5`, `2026.6.1`, …). Docker fixed production tags add patch and build components (`2026.5.0.0`, `2026.6.1.0`). CI enforces the mapping via `scripts/check-weblate-pin-sync.sh`. Bumps are proposed by the `Weblate pin bump` GitHub Actions workflow when both registries have the release.
@@ -385,7 +385,7 @@ The workflow does not check deploy status or server health.
 
 1. Checks out `main` and reads [`pyproject.toml`](../pyproject.toml):
    - Plugin version: `[project].version` (e.g. `1.0.0`)
-   - Weblate pin: `Weblate[all]==…` (e.g. `2026.5`)
+   - Weblate pin: `Weblate[postgres]==…` (e.g. `2026.5`)
 2. Fails if tag `v<plugin-version>` already exists on `origin` (prevents duplicate releases)
 3. Extracts the matching `## [<plugin-version>]` section from [`CHANGELOG.md`](../CHANGELOG.md) (fails if missing, before any tag is pushed)
 4. Creates annotated tag `v<plugin-version>` on current `main` HEAD and pushes it

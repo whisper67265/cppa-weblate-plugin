@@ -21,7 +21,7 @@ updates:
   labels:
   - dependencies
   - python
-  # Direct deps only (packaging, Weblate[all]). Transitive lockfile entries are
+  # Direct deps only (packaging, Weblate[postgres]). Transitive lockfile entries are
   # pinned by Weblate and updated via weblate-pin-bump, not independently.
   allow:
   - dependency-type: direct

@@ -16,7 +16,7 @@ pypi_ver="$(parse_pypi_weblate_version "$PYPI_FILE")"
 docker_tag="$(parse_docker_weblate_tag "$DOCKER_FILE")"
 
 if [[ -z "$pypi_ver" ]]; then
-  echo "ERROR: could not parse Weblate[all]==… from ${PYPI_FILE}" >&2
+  echo "ERROR: could not parse Weblate[…]==… from ${PYPI_FILE}" >&2
   exit 1
 fi
 
@@ -29,7 +29,7 @@ expected_docker="$(pypi_to_docker_fixed "$pypi_ver")"
 
 if [[ "$docker_tag" != "$expected_docker" ]]; then
   echo "ERROR: Weblate pin mismatch between PyPI and Docker base image." >&2
-  echo "  pyproject.toml (PyPI):     Weblate[all]==${pypi_ver}" >&2
+  echo "  pyproject.toml (PyPI):     Weblate[postgres]==${pypi_ver}" >&2
   echo "  Dockerfile tag:           weblate/weblate:${docker_tag}" >&2
   echo "  expected Docker fixed tag: weblate/weblate:${expected_docker}" >&2
   exit 1
