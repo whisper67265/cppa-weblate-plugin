@@ -351,6 +351,19 @@ def test_parse_qbk_paragraph_breaks_on_soft_wrap_space_line() -> None:
     assert segs[0].msgid == "first line"
 
 
+def test_parse_qbk_inline_url_followed_by_prose_on_same_line() -> None:
+    segs = _parse_qbk("[@https://example.com/page HEAD 请求] 方法表示客户端。\n")
+    assert len(segs) == 1
+    assert segs[0].seg_type == "paragraph"
+    assert segs[0].msgid == "[@https://example.com/page HEAD 请求] 方法表示客户端。"
+
+    segs = _parse_qbk("[@https://example.com x] prose.\n")
+    assert len(segs) == 1
+    assert segs[0].msgid == "[@https://example.com x] prose."
+
+    assert _parse_qbk("[@https://example.com x]\n") == []
+
+
 def test_parse_qbk_paragraph_unclosed_bracket_then_para_break() -> None:
     text = "intro\n[note not closed here\n[h2 real]\n"
     segs = _parse_qbk(text)

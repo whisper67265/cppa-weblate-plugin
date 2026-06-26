@@ -483,6 +483,12 @@ def _parse_qbk(
                     break
             continue
 
+        # Whitespace after inline bracket markup on the same line (e.g. "[@url] prose").
+        if ch in {" ", "\t"}:
+            while i < stop and content[i] in {" ", "\t"}:
+                i += 1
+            continue
+
         if content[i : i + 3] == "'''":
             i += 3
             while i < stop and content[i : i + 3] != "'''":
@@ -507,127 +513,137 @@ def _parse_qbk(
             i = end + 1
 
             if kw in _SKIP_KEYWORDS or kw in _SKIP_SINGLE_CHARS:
-                continue
+                eol = end + 1
+                while eol < stop and content[eol] != "\n":
+                    eol += 1
+                if _has_prose(content[end + 1 : eol]):
+                    i = bracket_start
+                else:
+                    continue
+            else:
+                raw_inner = block_text[content_off:-1]
+                lstrip_n = len(raw_inner) - len(raw_inner.lstrip())
+                rstrip_n = len(raw_inner) - len(raw_inner.rstrip())
+                inner = raw_inner.strip()
+                if not inner:
+                    continue
 
-            raw_inner = block_text[content_off:-1]
-            lstrip_n = len(raw_inner) - len(raw_inner.lstrip())
-            rstrip_n = len(raw_inner) - len(raw_inner.rstrip())
-            inner = raw_inner.strip()
-            if not inner:
-                continue
+                inner_abs_start = bracket_start + content_off + lstrip_n
+                inner_abs_end = bracket_start + len(block_text) - 1 - rstrip_n
+                inner_multiline = "\n" in inner
 
-            inner_abs_start = bracket_start + content_off + lstrip_n
-            inner_abs_end = bracket_start + len(block_text) - 1 - rstrip_n
-            inner_multiline = "\n" in inner
-
-            if kw in _HEADING_KEYWORDS:
-                ctx = f"heading {kw[1]}" if kw != "heading" else "heading"
-                segments.append(
-                    _Seg(
-                        inner_abs_start,
-                        inner_abs_end,
-                        bracket_line,
-                        "heading",
-                        inner,
-                        no_wrap=True,
-                        context=ctx,
+                if kw in _HEADING_KEYWORDS:
+                    ctx = f"heading {kw[1]}" if kw != "heading" else "heading"
+                    segments.append(
+                        _Seg(
+                            inner_abs_start,
+                            inner_abs_end,
+                            bracket_line,
+                            "heading",
+                            inner,
+                            no_wrap=True,
+                            context=ctx,
+                        )
                     )
-                )
-                continue
+                    continue
 
-            if kw == "section":
-                if inner_multiline:
-                    nl_pos = inner.index("\n")
-                    raw_title_line = inner[:nl_pos]
-                    title = raw_title_line.strip()
-                    if title:
-                        title_lead = raw_title_line.index(title)
-                        title_abs_start = inner_abs_start + title_lead
-                        title_abs_end = title_abs_start + len(title)
+                if kw == "section":
+                    if inner_multiline:
+                        nl_pos = inner.index("\n")
+                        raw_title_line = inner[:nl_pos]
+                        title = raw_title_line.strip()
+                        if title:
+                            title_lead = raw_title_line.index(title)
+                            title_abs_start = inner_abs_start + title_lead
+                            title_abs_end = title_abs_start + len(title)
+                            segments.append(
+                                _Seg(
+                                    title_abs_start,
+                                    title_abs_end,
+                                    bracket_line,
+                                    "section-title",
+                                    title,
+                                    no_wrap=True,
+                                    context="section title",
+                                )
+                            )
+                        body_abs_start = inner_abs_start + nl_pos + 1
+                        if body_abs_start < inner_abs_end:
+                            segments.extend(
+                                _parse_qbk(
+                                    content, body_abs_start, inner_abs_end, _depth + 1
+                                )
+                            )
+                    else:
                         segments.append(
                             _Seg(
-                                title_abs_start,
-                                title_abs_end,
+                                inner_abs_start,
+                                inner_abs_end,
                                 bracket_line,
                                 "section-title",
-                                title,
+                                inner,
                                 no_wrap=True,
                                 context="section title",
                             )
                         )
-                    body_abs_start = inner_abs_start + nl_pos + 1
-                    if body_abs_start < inner_abs_end:
+                    continue
+
+                if kw in _ADMONITION_KEYWORDS:
+                    if inner_multiline:
                         segments.extend(
                             _parse_qbk(
-                                content, body_abs_start, inner_abs_end, _depth + 1
+                                content, inner_abs_start, inner_abs_end, _depth + 1
                             )
                         )
-                else:
-                    segments.append(
-                        _Seg(
-                            inner_abs_start,
-                            inner_abs_end,
-                            bracket_line,
-                            "section-title",
-                            inner,
-                            no_wrap=True,
-                            context="section title",
+                    else:
+                        segments.append(
+                            _Seg(
+                                inner_abs_start,
+                                inner_abs_end,
+                                bracket_line,
+                                "admonition",
+                                inner,
+                                no_wrap=False,
+                                context=kw,
+                            )
                         )
-                    )
-                continue
+                    continue
 
-            if kw in _ADMONITION_KEYWORDS:
-                if inner_multiline:
+                if kw == ":":
+                    if inner_multiline:
+                        segments.extend(
+                            _parse_qbk(
+                                content, inner_abs_start, inner_abs_end, _depth + 1
+                            )
+                        )
+                    else:
+                        segments.append(
+                            _Seg(
+                                inner_abs_start,
+                                inner_abs_end,
+                                bracket_line,
+                                "blockquote",
+                                inner,
+                                no_wrap=False,
+                                context="blockquote",
+                            )
+                        )
+                    continue
+
+                if kw in {"table", "variablelist"}:
                     segments.extend(
-                        _parse_qbk(content, inner_abs_start, inner_abs_end, _depth + 1)
-                    )
-                else:
-                    segments.append(
-                        _Seg(
+                        _parse_table_inner(
+                            content,
                             inner_abs_start,
                             inner_abs_end,
                             bracket_line,
-                            "admonition",
-                            inner,
-                            no_wrap=False,
-                            context=kw,
+                            kw,
+                            _depth,
                         )
                     )
-                continue
+                    continue
 
-            if kw == ":":
-                if inner_multiline:
-                    segments.extend(
-                        _parse_qbk(content, inner_abs_start, inner_abs_end, _depth + 1)
-                    )
-                else:
-                    segments.append(
-                        _Seg(
-                            inner_abs_start,
-                            inner_abs_end,
-                            bracket_line,
-                            "blockquote",
-                            inner,
-                            no_wrap=False,
-                            context="blockquote",
-                        )
-                    )
                 continue
-
-            if kw in {"table", "variablelist"}:
-                segments.extend(
-                    _parse_table_inner(
-                        content,
-                        inner_abs_start,
-                        inner_abs_end,
-                        bracket_line,
-                        kw,
-                        _depth,
-                    )
-                )
-                continue
-
-            continue
 
         para_start = i
         para_line = line

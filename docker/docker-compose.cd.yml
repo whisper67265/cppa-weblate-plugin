@@ -20,9 +20,9 @@ services:
     environment:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set in .env}
       WEBLATE_ADMIN_PASSWORD: ${WEBLATE_ADMIN_PASSWORD:?set in .env}
-      POSTGRES_HOST: host.docker.internal
+      POSTGRES_HOST: ${POSTGRES_HOST:-host.docker.internal}
       POSTGRES_PORT: ${POSTGRES_PORT:-5432}
-      REDIS_HOST: redis
+      REDIS_HOST: ${REDIS_HOST:-redis}
       REDIS_PORT: ${REDIS_PORT:-6379}
     healthcheck:
       test: [CMD, curl, -sf, 'http://localhost:8080${WEBLATE_URL_PREFIX:-}/healthz/']
