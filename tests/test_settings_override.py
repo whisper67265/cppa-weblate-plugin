@@ -8,11 +8,30 @@ from __future__ import annotations
 
 import importlib
 import importlib.util
+import subprocess
+import sys
+import textwrap
+from collections.abc import Callable
 from pathlib import Path
 
 import pytest
 
 from boost_weblate.formats import registry
+
+_ENDPOINT_APP_CONFIG = "boost_weblate.endpoint.apps.BoostEndpointConfig"
+_REPO_ROOT = Path(__file__).resolve().parents[1]
+_SETTINGS_OVERRIDE_PATH = _REPO_ROOT / "src/boost_weblate/settings_override.py"
+
+
+def _exec_settings_override(namespace: dict) -> None:
+    exec(
+        compile(
+            _SETTINGS_OVERRIDE_PATH.read_text(encoding="utf-8"),
+            str(_SETTINGS_OVERRIDE_PATH),
+            "exec",
+        ),
+        namespace,
+    )
 
 
 def _plugin_weblate_paths() -> tuple[str, ...]:
@@ -143,3 +162,120 @@ def test_boost_task_timeout_settings_rejects_invalid_limits(
     monkeypatch.setenv("BOOST_TASK_TIME_LIMIT", "900")
     with pytest.raises(ValueError, match="BOOST_TASK_TIME_LIMIT"):
         boost_task_timeout_settings()
+
+
+@pytest.mark.parametrize(
+    "factory",
+    [
+        lambda: ["django.contrib.auth"],
+        lambda: ("django.contrib.auth",),
+    ],
+    ids=["list", "tuple"],
+)
+def test_double_exec_does_not_duplicate_installed_apps(
+    factory: Callable[[], list[str] | tuple[str, ...]],
+) -> None:
+    base_apps = factory()
+    ns: dict[str, object] = {"INSTALLED_APPS": base_apps}
+    _exec_settings_override(ns)
+    _exec_settings_override(ns)
+    apps = ns["INSTALLED_APPS"]
+    assert apps.count(_ENDPOINT_APP_CONFIG) == 1
+    assert apps[0] == "django.contrib.auth"
+    if isinstance(base_apps, tuple):
+        assert isinstance(apps, tuple)
+
+
+def test_double_exec_does_not_double_ready_hooks() -> None:
+    script = textwrap.dedent(
+        f"""
+        import os
+        import sys
+        import tempfile
+        import types
+        from pathlib import Path
+
+        repo = Path({str(_REPO_ROOT)!r})
+        sys.path.insert(0, str(repo))
+        sys.path.insert(0, str(repo / "src"))
+
+        import weblate.settings_example as _wl_example
+
+        ns: dict[str, object] = {{}}
+        for _key, _value in _wl_example.__dict__.items():
+            if _key.isupper():
+                ns[_key] = _value
+
+        ns["INSTALLED_APPS"] = tuple(
+            app
+            for app in _wl_example.INSTALLED_APPS
+            if app != "django.contrib.postgres"
+        )
+
+        _data = tempfile.mkdtemp(prefix="double_exec_settings_")
+        ns["DATA_DIR"] = _data
+        ns["CACHE_DIR"] = os.path.join(_data, "cache")
+        ns["MEDIA_ROOT"] = os.path.join(_data, "media")
+        ns["STATIC_ROOT"] = os.path.join(_data, "static")
+        for _p in (ns["CACHE_DIR"], ns["MEDIA_ROOT"], ns["STATIC_ROOT"]):
+            os.makedirs(_p, exist_ok=True)
+
+        ns["DATABASES"] = {{
+            "default": {{
+                "ENGINE": "django.db.backends.sqlite3",
+                "NAME": os.path.join(_data, "test.sqlite3"),
+            }}
+        }}
+        ns["SITE_DOMAIN"] = "test.invalid"
+        ns["DEBUG"] = False
+        ns["CELERY_TASK_ALWAYS_EAGER"] = True
+        ns["CELERY_BROKER_URL"] = "memory://"
+        ns["CELERY_TASK_EAGER_PROPAGATES"] = True
+        ns["CELERY_RESULT_BACKEND"] = None
+        ns["CACHES"] = {{
+            "default": {{"BACKEND": "django.core.cache.backends.locmem.LocMemCache"}}
+        }}
+        ns["PASSWORD_HASHERS"] = ["django.contrib.auth.hashers.MD5PasswordHasher"]
+
+        override_path = Path({str(_SETTINGS_OVERRIDE_PATH)!r})
+        override_code = compile(
+            override_path.read_text(encoding="utf-8"),
+            str(override_path),
+            "exec",
+        )
+        exec(override_code, ns)
+        exec(override_code, ns)
+
+        settings_mod = types.ModuleType("tests._double_exec_settings")
+        for _key, _value in ns.items():
+            if _key.isupper():
+                setattr(settings_mod, _key, _value)
+        sys.modules["tests._double_exec_settings"] = settings_mod
+        os.environ["DJANGO_SETTINGS_MODULE"] = "tests._double_exec_settings"
+
+        from boost_weblate.endpoint.apps import BoostEndpointConfig
+
+        ready_calls: list[int] = []
+        _original_ready = BoostEndpointConfig.ready
+
+        def _counting_ready(self: BoostEndpointConfig) -> None:
+            ready_calls.append(1)
+            return _original_ready(self)
+
+        BoostEndpointConfig.ready = _counting_ready  # type: ignore[method-assign]
+
+        import django
+
+        django.setup()
+        print(f"ready_calls={{len(ready_calls)}}")
+        """
+    )
+    result = subprocess.run(
+        [sys.executable, "-c", script],
+        capture_output=True,
+        text=True,
+        cwd=_REPO_ROOT,
+        check=False,
+    )
+    assert result.returncode == 0, result.stderr
+    assert "ready_calls=1" in result.stdout
