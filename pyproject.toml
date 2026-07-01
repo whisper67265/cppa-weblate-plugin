@@ -4,7 +4,7 @@
 
 [build-system]
 build-backend = "uv_build"
-requires = ["uv_build>=0.11.19,<0.12.0"]
+requires = ["uv_build>=0.11.25,<0.12.0"]
 
 [dependency-groups]
 dev = [
