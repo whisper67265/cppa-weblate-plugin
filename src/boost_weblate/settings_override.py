@@ -222,7 +222,7 @@ if _REST_FRAMEWORK is not None:
     globals()["REST_FRAMEWORK"] = merge_boost_endpoint_throttle_rates(_REST_FRAMEWORK)
 
 _INSTALLED_APPS = globals().get("INSTALLED_APPS")
-if _INSTALLED_APPS is not None:
+if _INSTALLED_APPS is not None and _ENDPOINT_APP_CONFIG not in _INSTALLED_APPS:
     # Tuple += creates a new object; assign back so exec namespace / settings see it.
     # List += mutates in place, matching Weblate/Docker settings namespaces.
     if isinstance(_INSTALLED_APPS, tuple):
