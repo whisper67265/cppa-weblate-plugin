@@ -232,3 +232,122 @@ def test_invalid_organization_still_flattens_other_drf_errors() -> None:
     assert org_errors[0]["code"] == BoostEndpointErrorCode.INVALID_CLONE_URL.value
     assert len(version_errors) == 1
     assert version_errors[0]["metadata"]["drf_code"] == "required"
+
+
+def test_add_or_update_serializer_rejects_invalid_version() -> None:
+    ser = AddOrUpdateRequestSerializer(
+        data={
+            "organization": "o",
+            "version": "../evil",
+            "add_or_update": {"zh_Hans": ["json"]},
+        }
+    )
+    assert not ser.is_valid()
+    assert BoostEndpointErrorCode.INVALID_CLONE_URL.value in _error_codes(
+        ser.structured_errors
+    )
+    version_errors = [
+        e for e in ser.structured_errors if e["metadata"]["field"] == "version"
+    ]
+    assert len(version_errors) == 1
+
+
+def test_add_or_update_serializer_rejects_sql_injection_lang_code() -> None:
+    ser = AddOrUpdateRequestSerializer(
+        data={
+            "organization": "o",
+            "version": "v",
+            "add_or_update": {"'; DROP TABLE--": ["json"]},
+        }
+    )
+    assert not ser.is_valid()
+    assert BoostEndpointErrorCode.INVALID_LANGUAGE_CODE.value in _error_codes(
+        ser.structured_errors
+    )
+
+
+def test_add_or_update_serializer_rejects_whitespace_lang_code() -> None:
+    ser = AddOrUpdateRequestSerializer(
+        data={
+            "organization": "o",
+            "version": "v",
+            "add_or_update": {"   ": ["json"]},
+        }
+    )
+    assert not ser.is_valid()
+    assert BoostEndpointErrorCode.INVALID_LANGUAGE_CODE.value in _error_codes(
+        ser.structured_errors
+    )
+
+
+def test_add_or_update_serializer_rejects_non_string_submodule() -> None:
+    ser = AddOrUpdateRequestSerializer(
+        data={
+            "organization": "o",
+            "version": "v",
+            "add_or_update": {"zh_Hans": [["json"]]},
+        }
+    )
+    assert not ser.is_valid()
+    assert any(e["metadata"]["field"] == "add_or_update" for e in ser.structured_errors)
+
+
+def test_add_or_update_serializer_rejects_oversized_organization() -> None:
+    ser = AddOrUpdateRequestSerializer(
+        data={
+            "organization": "o" * 10_000,
+            "version": "v",
+            "add_or_update": {"zh_Hans": ["json"]},
+        }
+    )
+    assert not ser.is_valid()
+    assert BoostEndpointErrorCode.INVALID_CLONE_URL.value in _error_codes(
+        ser.structured_errors
+    )
+
+
+def test_add_or_update_serializer_rejects_too_many_languages() -> None:
+    from boost_weblate.endpoint.validators import MAX_ADD_OR_UPDATE_LANGS
+
+    langs = {f"lang{i}": ["json"] for i in range(MAX_ADD_OR_UPDATE_LANGS + 1)}
+    ser = AddOrUpdateRequestSerializer(
+        data={
+            "organization": "o",
+            "version": "v",
+            "add_or_update": langs,
+        }
+    )
+    assert not ser.is_valid()
+    assert BoostEndpointErrorCode.INVALID_LANGUAGE_CODE.value in _error_codes(
+        ser.structured_errors
+    )
+
+
+def test_add_or_update_serializer_rejects_too_many_submodules() -> None:
+    from boost_weblate.endpoint.validators import MAX_SUBMODULES_PER_LANG
+
+    submodules = [f"mod{i}" for i in range(MAX_SUBMODULES_PER_LANG + 1)]
+    ser = AddOrUpdateRequestSerializer(
+        data={
+            "organization": "o",
+            "version": "v",
+            "add_or_update": {"zh_Hans": submodules},
+        }
+    )
+    assert not ser.is_valid()
+    assert BoostEndpointErrorCode.INVALID_SUBMODULE_LIST.value in _error_codes(
+        ser.structured_errors
+    )
+
+
+def test_add_or_update_serializer_rejects_extensions_dict() -> None:
+    ser = AddOrUpdateRequestSerializer(
+        data={
+            "organization": "o",
+            "version": "v",
+            "add_or_update": {"zh_Hans": ["json"]},
+            "extensions": {".md": True},
+        }
+    )
+    assert not ser.is_valid()
+    assert any(e["metadata"]["field"] == "extensions" for e in ser.structured_errors)

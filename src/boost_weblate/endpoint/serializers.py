@@ -17,7 +17,12 @@ from boost_weblate.endpoint.errors import (
     boost_validation_errors,
     to_error_dict,
 )
-from boost_weblate.endpoint.validators import validate_repo_segment
+from boost_weblate.endpoint.validators import (
+    MAX_ADD_OR_UPDATE_LANGS,
+    MAX_SUBMODULES_PER_LANG,
+    validate_language_code,
+    validate_repo_segment,
+)
 
 
 class DrfValidationCode(StrEnum):
@@ -190,15 +195,56 @@ class AddOrUpdateRequestSerializer(serializers.Serializer):
             )
             raise serializers.ValidationError(str(exc)) from exc
 
+    def validate_version(self, value: str) -> str:
+        """Reject version strings with unsafe characters or excessive length."""
+        try:
+            return validate_repo_segment(value, field="version")
+        except ValidationError as exc:
+            self._custom_error_fields.add(RequestField.VERSION)
+            self._custom_validation_errors.extend(
+                boost_validation_errors(
+                    [
+                        (
+                            BoostEndpointErrorCode.INVALID_CLONE_URL,
+                            str(exc),
+                            {"field": RequestField.VERSION},
+                        )
+                    ]
+                )
+            )
+            raise serializers.ValidationError(str(exc)) from exc
+
     def validate_extensions(self, value: list[str] | None) -> list[str] | None:
         """Strip entries and remove blanks so all-empty input does not filter files."""
         if value is None:
             return None
-        return [v.strip() for v in value if v.strip()]
+        cleaned: list[str] = []
+        for entry in value:
+            if not isinstance(entry, str):
+                raise serializers.ValidationError(
+                    "Each extension must be a string.",
+                    code=DrfValidationCode.NOT_A_LIST,
+                )
+            stripped = entry.strip()
+            if stripped:
+                cleaned.append(stripped)
+        return cleaned or None
 
     def validate_add_or_update(self, value: dict[str, Any]) -> dict[str, Any]:
         """Require non-empty string language keys and non-empty submodule lists."""
         items: list[tuple[BoostEndpointErrorCode, str, dict[str, Any]]] = []
+        if len(value) > MAX_ADD_OR_UPDATE_LANGS:
+            items.append(
+                (
+                    BoostEndpointErrorCode.INVALID_LANGUAGE_CODE,
+                    (
+                        f"add_or_update: exceeds maximum of "
+                        f"{MAX_ADD_OR_UPDATE_LANGS} language keys "
+                        f"(got {len(value)})."
+                    ),
+                    {"field": RequestField.ADD_OR_UPDATE},
+                )
+            )
         for lang_code, submodules in value.items():
             if not isinstance(lang_code, str) or lang_code.strip() == "":
                 items.append(
@@ -211,6 +257,20 @@ class AddOrUpdateRequestSerializer(serializers.Serializer):
                         {
                             "field": RequestField.ADD_OR_UPDATE,
                             "language": str(lang_code),
+                        },
+                    )
+                )
+                continue
+            try:
+                validate_language_code(lang_code)
+            except ValidationError as exc:
+                items.append(
+                    (
+                        BoostEndpointErrorCode.INVALID_LANGUAGE_CODE,
+                        str(exc),
+                        {
+                            "field": RequestField.ADD_OR_UPDATE,
+                            "language": lang_code,
                         },
                     )
                 )
@@ -234,6 +294,18 @@ class AddOrUpdateRequestSerializer(serializers.Serializer):
                         (
                             "add_or_update: each value must be a non-empty list of "
                             f"submodule names; key {lang_code!r} has an empty list."
+                        ),
+                        {"field": RequestField.ADD_OR_UPDATE, "language": lang_code},
+                    )
+                )
+            elif len(submodules) > MAX_SUBMODULES_PER_LANG:
+                items.append(
+                    (
+                        BoostEndpointErrorCode.INVALID_SUBMODULE_LIST,
+                        (
+                            f"add_or_update: key {lang_code!r} exceeds maximum of "
+                            f"{MAX_SUBMODULES_PER_LANG} submodules "
+                            f"(got {len(submodules)})."
                         ),
                         {"field": RequestField.ADD_OR_UPDATE, "language": lang_code},
                     )
