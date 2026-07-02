@@ -14,22 +14,55 @@ from urllib.parse import urlparse
 from django.conf import settings
 from django.core.exceptions import ValidationError
 
+MAX_SEGMENT_LEN = 256
+MAX_ADD_OR_UPDATE_LANGS = 50
+MAX_SUBMODULES_PER_LANG = 100
+
 _REPO_SEGMENT_RE = re.compile(r"^[A-Za-z0-9._-]+$")
+_LANGUAGE_CODE_RE = re.compile(r"^[a-zA-Z0-9_-]+$")
 
 # SCP-style SSH: git@host:path/to/repo.git
 _SCP_SSH_RE = re.compile(r"^git@([^:/]+):(.+)$")
 
 
+def _validate_segment(
+    value: str,
+    *,
+    field: str,
+    pattern: re.Pattern[str],
+    allowed_chars: str,
+) -> str:
+    if not value or not value.strip():
+        raise ValidationError(f"{field}: must be a non-empty string")
+    if len(value) > MAX_SEGMENT_LEN:
+        raise ValidationError(
+            f"{field}: exceeds maximum length of {MAX_SEGMENT_LEN} characters"
+        )
+    if not pattern.fullmatch(value):
+        raise ValidationError(
+            f"{field}: invalid characters in {value!r}; allowed: {allowed_chars}"
+        )
+    return value
+
+
 def validate_repo_segment(name: str, *, field: str) -> str:
     """Restrict organization/submodule to safe GitHub path segments."""
-    if not name or not name.strip():
-        raise ValidationError(f"{field}: must be a non-empty string")
-    if not _REPO_SEGMENT_RE.fullmatch(name):
-        raise ValidationError(
-            f"{field}: invalid characters in {name!r}; "
-            "allowed: letters, digits, '.', '_', '-'"
-        )
-    return name
+    return _validate_segment(
+        name,
+        field=field,
+        pattern=_REPO_SEGMENT_RE,
+        allowed_chars="letters, digits, '.', '_', '-'",
+    )
+
+
+def validate_language_code(code: str) -> str:
+    """Restrict language codes to safe Weblate-style identifiers."""
+    return _validate_segment(
+        code,
+        field="language",
+        pattern=_LANGUAGE_CODE_RE,
+        allowed_chars="letters, digits, '_', '-'",
+    )
 
 
 def _normalize_clone_url(url: str) -> str:
