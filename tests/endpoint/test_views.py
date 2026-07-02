@@ -558,6 +558,29 @@ _VALID_ADD_OR_UPDATE_BODY = {
 }
 
 
+@pytest.fixture
+def high_throttle_limits():
+    """Relax scoped/user throttles for adversarial and ORM trust-boundary tests."""
+    rest_framework = _throttle_rest_framework(
+        user="10000/hour",
+        info="10000/minute",
+        **{"add-or-update": "10000/hour"},
+    )
+    with _isolated_throttle_rates(rest_framework):
+        yield
+
+
+@pytest.fixture
+def mock_add_or_update_delay(monkeypatch: pytest.MonkeyPatch) -> MagicMock:
+    """Patch AddOrUpdateView Celery enqueue for rejection assertions."""
+    delay_mock = MagicMock()
+    monkeypatch.setattr(
+        "boost_weblate.endpoint.views.boost_add_or_update_task.delay",
+        delay_mock,
+    )
+    return delay_mock
+
+
 class TestPluginPingAdversarial:
     def test_post_returns_405(self) -> None:
         request = RequestFactory().post("/plugin-ping/")
@@ -626,17 +649,8 @@ class TestBoostEndpointInfoAdversarial:
         assert "info" in response.data["capabilities"]
 
 
+@pytest.mark.usefixtures("high_throttle_limits")
 class TestAddOrUpdateAdversarial:
-    @pytest.fixture(autouse=True)
-    def _high_throttle_limits(self):
-        rest_framework = _throttle_rest_framework(
-            user="10000/hour",
-            info="10000/minute",
-            **{"add-or-update": "10000/hour"},
-        )
-        with _isolated_throttle_rates(rest_framework):
-            yield
-
     @staticmethod
     def _authenticated_post(body, *, format="json", content_type=None, data=None):
         factory = APIRequestFactory()
@@ -652,13 +666,8 @@ class TestAddOrUpdateAdversarial:
         return request, user
 
     def test_non_json_body_rejected_without_enqueue(
-        self, monkeypatch: pytest.MonkeyPatch
+        self, mock_add_or_update_delay: MagicMock
     ) -> None:
-        delay_mock = MagicMock()
-        monkeypatch.setattr(
-            "boost_weblate.endpoint.views.boost_add_or_update_task.delay",
-            delay_mock,
-        )
         request, _ = self._authenticated_post(
             None, content_type="application/json", data="not-json"
         )
@@ -667,16 +676,11 @@ class TestAddOrUpdateAdversarial:
             status.HTTP_400_BAD_REQUEST,
             status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
         )
-        delay_mock.assert_not_called()
+        mock_add_or_update_delay.assert_not_called()
 
     def test_add_or_update_string_type_rejected(
-        self, monkeypatch: pytest.MonkeyPatch
+        self, mock_add_or_update_delay: MagicMock
     ) -> None:
-        delay_mock = MagicMock()
-        monkeypatch.setattr(
-            "boost_weblate.endpoint.views.boost_add_or_update_task.delay",
-            delay_mock,
-        )
         body = {
             **_VALID_ADD_OR_UPDATE_BODY,
             "add_or_update": "not-a-dict",
@@ -685,16 +689,11 @@ class TestAddOrUpdateAdversarial:
         response = AddOrUpdateView.as_view()(request)
         assert response.status_code == status.HTTP_400_BAD_REQUEST
         assert "errors" in response.data
-        delay_mock.assert_not_called()
+        mock_add_or_update_delay.assert_not_called()
 
     def test_extensions_dict_type_rejected(
-        self, monkeypatch: pytest.MonkeyPatch
+        self, mock_add_or_update_delay: MagicMock
     ) -> None:
-        delay_mock = MagicMock()
-        monkeypatch.setattr(
-            "boost_weblate.endpoint.views.boost_add_or_update_task.delay",
-            delay_mock,
-        )
         body = {
             **_VALID_ADD_OR_UPDATE_BODY,
             "extensions": {"not": "a-list"},
@@ -703,16 +702,11 @@ class TestAddOrUpdateAdversarial:
         response = AddOrUpdateView.as_view()(request)
         assert response.status_code == status.HTTP_400_BAD_REQUEST
         assert "errors" in response.data
-        delay_mock.assert_not_called()
+        mock_add_or_update_delay.assert_not_called()
 
     def test_oversized_organization_rejected(
-        self, monkeypatch: pytest.MonkeyPatch
+        self, mock_add_or_update_delay: MagicMock
     ) -> None:
-        delay_mock = MagicMock()
-        monkeypatch.setattr(
-            "boost_weblate.endpoint.views.boost_add_or_update_task.delay",
-            delay_mock,
-        )
         body = {
             **_VALID_ADD_OR_UPDATE_BODY,
             "organization": "o" * 10_000,
@@ -722,14 +716,11 @@ class TestAddOrUpdateAdversarial:
         assert response.status_code == status.HTTP_400_BAD_REQUEST
         codes = [e["code"] for e in response.data["errors"]]
         assert BoostEndpointErrorCode.INVALID_CLONE_URL.value in codes
-        delay_mock.assert_not_called()
+        mock_add_or_update_delay.assert_not_called()
 
-    def test_oversized_version_rejected(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        delay_mock = MagicMock()
-        monkeypatch.setattr(
-            "boost_weblate.endpoint.views.boost_add_or_update_task.delay",
-            delay_mock,
-        )
+    def test_oversized_version_rejected(
+        self, mock_add_or_update_delay: MagicMock
+    ) -> None:
         body = {
             **_VALID_ADD_OR_UPDATE_BODY,
             "version": "v" * 10_000,
@@ -739,18 +730,13 @@ class TestAddOrUpdateAdversarial:
         assert response.status_code == status.HTTP_400_BAD_REQUEST
         codes = [e["code"] for e in response.data["errors"]]
         assert BoostEndpointErrorCode.INVALID_CLONE_URL.value in codes
-        delay_mock.assert_not_called()
+        mock_add_or_update_delay.assert_not_called()
 
     def test_oversized_add_or_update_lang_count_rejected(
-        self, monkeypatch: pytest.MonkeyPatch
+        self, mock_add_or_update_delay: MagicMock
     ) -> None:
         from boost_weblate.endpoint.validators import MAX_ADD_OR_UPDATE_LANGS
 
-        delay_mock = MagicMock()
-        monkeypatch.setattr(
-            "boost_weblate.endpoint.views.boost_add_or_update_task.delay",
-            delay_mock,
-        )
         langs = {f"lang{i}": ["json"] for i in range(MAX_ADD_OR_UPDATE_LANGS + 1)}
         body = {**_VALID_ADD_OR_UPDATE_BODY, "add_or_update": langs}
         request, _ = self._authenticated_post(body)
@@ -758,64 +744,44 @@ class TestAddOrUpdateAdversarial:
         assert response.status_code == status.HTTP_400_BAD_REQUEST
         codes = [e["code"] for e in response.data["errors"]]
         assert BoostEndpointErrorCode.INVALID_LANGUAGE_CODE.value in codes
-        delay_mock.assert_not_called()
+        mock_add_or_update_delay.assert_not_called()
 
     @pytest.mark.parametrize("payload", _SQL_INJECTION_PAYLOADS)
     def test_sql_injection_in_organization_rejected(
-        self, payload: str, monkeypatch: pytest.MonkeyPatch
+        self, payload: str, mock_add_or_update_delay: MagicMock
     ) -> None:
-        delay_mock = MagicMock()
-        monkeypatch.setattr(
-            "boost_weblate.endpoint.views.boost_add_or_update_task.delay",
-            delay_mock,
-        )
         body = {**_VALID_ADD_OR_UPDATE_BODY, "organization": payload}
         request, _ = self._authenticated_post(body)
         response = AddOrUpdateView.as_view()(request)
         assert response.status_code == status.HTTP_400_BAD_REQUEST
         codes = [e["code"] for e in response.data["errors"]]
         assert BoostEndpointErrorCode.INVALID_CLONE_URL.value in codes
-        delay_mock.assert_not_called()
+        mock_add_or_update_delay.assert_not_called()
 
     @pytest.mark.parametrize("payload", _PATH_TRAVERSAL_PAYLOADS)
     def test_path_traversal_in_organization_rejected(
-        self, payload: str, monkeypatch: pytest.MonkeyPatch
+        self, payload: str, mock_add_or_update_delay: MagicMock
     ) -> None:
-        delay_mock = MagicMock()
-        monkeypatch.setattr(
-            "boost_weblate.endpoint.views.boost_add_or_update_task.delay",
-            delay_mock,
-        )
         body = {**_VALID_ADD_OR_UPDATE_BODY, "organization": payload}
         request, _ = self._authenticated_post(body)
         response = AddOrUpdateView.as_view()(request)
         assert response.status_code == status.HTTP_400_BAD_REQUEST
-        delay_mock.assert_not_called()
+        mock_add_or_update_delay.assert_not_called()
 
     @pytest.mark.parametrize("payload", _SQL_INJECTION_PAYLOADS)
     def test_sql_injection_in_version_rejected(
-        self, payload: str, monkeypatch: pytest.MonkeyPatch
+        self, payload: str, mock_add_or_update_delay: MagicMock
     ) -> None:
-        delay_mock = MagicMock()
-        monkeypatch.setattr(
-            "boost_weblate.endpoint.views.boost_add_or_update_task.delay",
-            delay_mock,
-        )
         body = {**_VALID_ADD_OR_UPDATE_BODY, "version": payload}
         request, _ = self._authenticated_post(body)
         response = AddOrUpdateView.as_view()(request)
         assert response.status_code == status.HTTP_400_BAD_REQUEST
-        delay_mock.assert_not_called()
+        mock_add_or_update_delay.assert_not_called()
 
     @pytest.mark.parametrize("payload", _SQL_INJECTION_PAYLOADS)
     def test_sql_injection_in_lang_code_rejected(
-        self, payload: str, monkeypatch: pytest.MonkeyPatch
+        self, payload: str, mock_add_or_update_delay: MagicMock
     ) -> None:
-        delay_mock = MagicMock()
-        monkeypatch.setattr(
-            "boost_weblate.endpoint.views.boost_add_or_update_task.delay",
-            delay_mock,
-        )
         body = {
             **_VALID_ADD_OR_UPDATE_BODY,
             "add_or_update": {payload: ["json"]},
@@ -825,35 +791,21 @@ class TestAddOrUpdateAdversarial:
         assert response.status_code == status.HTTP_400_BAD_REQUEST
         codes = [e["code"] for e in response.data["errors"]]
         assert BoostEndpointErrorCode.INVALID_LANGUAGE_CODE.value in codes
-        delay_mock.assert_not_called()
+        mock_add_or_update_delay.assert_not_called()
 
     @pytest.mark.parametrize("payload", _CONTROL_BYTE_PAYLOADS)
     def test_control_bytes_in_organization_rejected(
-        self, payload: str, monkeypatch: pytest.MonkeyPatch
+        self, payload: str, mock_add_or_update_delay: MagicMock
     ) -> None:
-        delay_mock = MagicMock()
-        monkeypatch.setattr(
-            "boost_weblate.endpoint.views.boost_add_or_update_task.delay",
-            delay_mock,
-        )
         body = {**_VALID_ADD_OR_UPDATE_BODY, "organization": payload}
         request, _ = self._authenticated_post(body)
         response = AddOrUpdateView.as_view()(request)
         assert response.status_code == status.HTTP_400_BAD_REQUEST
-        delay_mock.assert_not_called()
+        mock_add_or_update_delay.assert_not_called()
 
 
+@pytest.mark.usefixtures("high_throttle_limits")
 class TestOrmTrustBoundary:
-    @pytest.fixture(autouse=True)
-    def _high_throttle_limits(self):
-        rest_framework = _throttle_rest_framework(
-            user="10000/hour",
-            info="10000/minute",
-            **{"add-or-update": "10000/hour"},
-        )
-        with _isolated_throttle_rates(rest_framework):
-            yield
-
     def test_rejected_injection_never_reaches_celery(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:

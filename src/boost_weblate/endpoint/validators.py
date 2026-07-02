@@ -25,37 +25,44 @@ _LANGUAGE_CODE_RE = re.compile(r"^[a-zA-Z0-9_-]+$")
 _SCP_SSH_RE = re.compile(r"^git@([^:/]+):(.+)$")
 
 
-def _check_segment_length(name: str, *, field: str) -> None:
-    if len(name) > MAX_SEGMENT_LEN:
+def _validate_segment(
+    value: str,
+    *,
+    field: str,
+    pattern: re.Pattern[str],
+    allowed_chars: str,
+) -> str:
+    if not value or not value.strip():
+        raise ValidationError(f"{field}: must be a non-empty string")
+    if len(value) > MAX_SEGMENT_LEN:
         raise ValidationError(
             f"{field}: exceeds maximum length of {MAX_SEGMENT_LEN} characters"
         )
+    if not pattern.fullmatch(value):
+        raise ValidationError(
+            f"{field}: invalid characters in {value!r}; allowed: {allowed_chars}"
+        )
+    return value
 
 
 def validate_repo_segment(name: str, *, field: str) -> str:
     """Restrict organization/submodule to safe GitHub path segments."""
-    if not name or not name.strip():
-        raise ValidationError(f"{field}: must be a non-empty string")
-    _check_segment_length(name, field=field)
-    if not _REPO_SEGMENT_RE.fullmatch(name):
-        raise ValidationError(
-            f"{field}: invalid characters in {name!r}; "
-            "allowed: letters, digits, '.', '_', '-'"
-        )
-    return name
+    return _validate_segment(
+        name,
+        field=field,
+        pattern=_REPO_SEGMENT_RE,
+        allowed_chars="letters, digits, '.', '_', '-'",
+    )
 
 
 def validate_language_code(code: str) -> str:
     """Restrict language codes to safe Weblate-style identifiers."""
-    if not code or not code.strip():
-        raise ValidationError("language: must be a non-empty string")
-    _check_segment_length(code, field="language")
-    if not _LANGUAGE_CODE_RE.fullmatch(code):
-        raise ValidationError(
-            f"language: invalid characters in {code!r}; "
-            "allowed: letters, digits, '_', '-'"
-        )
-    return code
+    return _validate_segment(
+        code,
+        field="language",
+        pattern=_LANGUAGE_CODE_RE,
+        allowed_chars="letters, digits, '_', '-'",
+    )
 
 
 def _normalize_clone_url(url: str) -> str:

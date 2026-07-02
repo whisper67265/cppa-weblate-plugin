@@ -245,6 +245,9 @@ class AddOrUpdateRequestSerializer(serializers.Serializer):
                     {"field": RequestField.ADD_OR_UPDATE},
                 )
             )
+            self._custom_error_fields.add(RequestField.ADD_OR_UPDATE)
+            self._custom_validation_errors.extend(boost_validation_errors(items))
+            raise serializers.ValidationError({RequestField.ADD_OR_UPDATE: "invalid"})
         for lang_code, submodules in value.items():
             if not isinstance(lang_code, str) or lang_code.strip() == "":
                 items.append(
